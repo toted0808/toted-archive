@@ -3,7 +3,6 @@ const $ = (id) => document.getElementById(id);
 
 const DB_NAME = 'totedArchive';
 const DB_VERSION = 1;
-const MAX_PHOTOS = 20;
 const MAX_FILE_SIZE = 6 * 1024 * 1024;
 
 let db;
@@ -316,11 +315,6 @@ async function handleUpload(event) {
 
   if (photoFiles.length === 0) {
     status.textContent = '사진을 한 장 이상 선택해 주세요.';
-    return;
-  }
-
-  if (photoFiles.length > MAX_PHOTOS) {
-    status.textContent = `사진은 최대 ${MAX_PHOTOS}장까지 등록할 수 있습니다.`;
     return;
   }
 
