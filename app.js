@@ -1,4 +1,5 @@
 
+
 const $ = (id) => document.getElementById(id);
 
 const DB_NAME = 'totedArchive';
@@ -76,6 +77,7 @@ function getAlbumPhotos(albumId) {
       const photos = request.result.sort(
         (a, b) => a.sortOrder - b.sortOrder
       );
+
       resolve(photos);
     };
 
@@ -105,6 +107,7 @@ function savePhotos(photos) {
   });
 }
 
+// 앨범 삭제
 async function deleteAlbum(album) {
   const confirmed = confirm(
     `"${album.title}" 앨범과 안에 들어 있는 모든 사진을 삭제할까요?\n삭제한 데이터는 복구할 수 없습니다.`
@@ -120,10 +123,16 @@ async function deleteAlbum(album) {
 
     const albumStore = transaction.objectStore('albums');
     const photoStore = transaction.objectStore('photos');
-    const photoIndex = photoStore.index('albumId');
 
     albumStore.delete(album.id);
 
+    photoStore.delete(
+      IDBKeyRange.only(album.id)
+    );
+
+    // 위 코드는 사진의 기본 키가 albumId인 경우에만 작동하므로,
+    // 실제 사진 ID를 순회해서 삭제한다.
+    const photoIndex = photoStore.index('albumId');
     const request = photoIndex.openCursor(
       IDBKeyRange.only(album.id)
     );
@@ -145,23 +154,15 @@ async function deleteAlbum(album) {
 
     currentAlbum = null;
     currentPhotos = [];
+
     clearUrls();
 
     await showHome();
+
   } catch (error) {
     console.error(error);
     alert('앨범 삭제에 실패했습니다.');
   }
-}
-
-function showHomeView() {
-  $('homeView').classList.remove('hidden');
-  $('albumView').classList.add('hidden');
-}
-
-function showAlbumView() {
-  $('homeView').classList.add('hidden');
-  $('albumView').classList.remove('hidden');
 }
 
 async function loadAlbums() {
@@ -219,13 +220,15 @@ async function showHome() {
   await loadAlbums();
 }
 
+// 앨범 열기
 async function openAlbum(album) {
   currentAlbum = album;
   currentPhotos = await getAlbumPhotos(album.id);
 
   clearUrls();
 
-  showAlbumView();
+  $('homeView').classList.add('hidden');
+  $('albumView').classList.remove('hidden');
 
   $('albumTitle').textContent = album.title;
   $('albumCover').innerHTML = '';
@@ -236,18 +239,19 @@ async function openAlbum(album) {
 
   $('albumCover').appendChild(coverImage);
 
-  $('photoCount').textContent = `${currentPhotos.length} PHOTOS`;
+  $('photoCount').textContent =
+    `${currentPhotos.length} PHOTOS`;
 
+  // 삭제 버튼 생성 및 표시
   let deleteButton = $('deleteAlbum');
 
   if (!deleteButton) {
     deleteButton = document.createElement('button');
-    deleteButton.id = 'deleteAlbum';
-    deleteButton.className = 'back-button delete-album-button';
-    deleteButton.type = 'button';
-    deleteButton.textContent = '앨범 삭제';
 
-    $('photoCount').after(deleteButton);
+    deleteButton.id = 'deleteAlbum';
+    deleteButton.type = 'button';
+    deleteButton.className = 'back-button delete-album-button';
+    deleteButton.textContent = '앨범 삭제';
 
     deleteButton.addEventListener('click', () => {
       if (currentAlbum) {
@@ -256,6 +260,12 @@ async function openAlbum(album) {
     });
   }
 
+  // 제목과 사진 수가 있는 영역에 버튼 추가
+  const heading = $('albumTitle').parentElement;
+  heading.appendChild(deleteButton);
+  deleteButton.hidden = false;
+
+  // 사진 목록
   const grid = $('photoGrid');
   grid.innerHTML = '';
 
@@ -292,6 +302,7 @@ function validateImage(file) {
   );
 }
 
+// 사진 업로드
 async function handleUpload(event) {
   event.preventDefault();
 
@@ -327,7 +338,9 @@ async function handleUpload(event) {
     return;
   }
 
-  const invalidFile = photoFiles.find((file) => !validateImage(file));
+  const invalidFile = photoFiles.find(
+    (file) => !validateImage(file)
+  );
 
   if (invalidFile) {
     status.textContent = '사진은 JPG, PNG, WEBP, GIF 형식이며 각각 6MB 이하여야 합니다.';
@@ -335,6 +348,7 @@ async function handleUpload(event) {
   }
 
   const submitButton = $('submitUpload');
+
   submitButton.disabled = true;
   status.textContent = '사진을 저장하고 있습니다...';
 
@@ -362,6 +376,7 @@ async function handleUpload(event) {
     status.textContent = '';
 
     await showHome();
+
   } catch (error) {
     console.error(error);
     status.textContent = '저장에 실패했습니다. 저장 공간을 확인해 주세요.';
@@ -370,10 +385,12 @@ async function handleUpload(event) {
   }
 }
 
+// 사진 뷰어
 function openViewer(index) {
   currentPhotoIndex = index;
 
   $('viewer').classList.remove('hidden');
+
   updateViewer();
 
   $('viewer').focus();
@@ -389,6 +406,7 @@ function updateViewer() {
   if (!photo) return;
 
   $('viewerImage').src = createObjectUrl(photo.blob);
+
   $('viewerCounter').textContent =
     `${currentPhotoIndex + 1} / ${currentPhotos.length}`;
 }
@@ -429,22 +447,28 @@ function setupViewer() {
 
   $('viewerStage').addEventListener('touchstart', (event) => {
     const touch = event.touches[0];
+
     startX = touch.clientX;
     startY = touch.clientY;
   }, { passive: true });
 
   $('viewerStage').addEventListener('touchend', (event) => {
     const touch = event.changedTouches[0];
+
     const diffX = touch.clientX - startX;
     const diffY = touch.clientY - startY;
 
-    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+    if (
+      Math.abs(diffX) > 50 &&
+      Math.abs(diffX) > Math.abs(diffY)
+    ) {
       if (diffX < 0) nextPhoto();
       else previousPhoto();
     }
   }, { passive: true });
 }
 
+// 업로드 창
 function setupUploadDialog() {
   $('openUpload').addEventListener('click', () => {
     $('uploadDialog').showModal();
@@ -457,6 +481,7 @@ function setupUploadDialog() {
   $('uploadForm').addEventListener('submit', handleUpload);
 }
 
+// 시작
 async function init() {
   try {
     db = await openDatabase();
@@ -467,8 +492,10 @@ async function init() {
     setupViewer();
 
     await showHome();
+
   } catch (error) {
     console.error(error);
+
     $('homeMessage').textContent =
       '저장소를 불러오지 못했습니다. 브라우저 설정을 확인해 주세요.';
   }
