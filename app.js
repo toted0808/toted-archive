@@ -122,25 +122,77 @@ async function openAlbum(album){
   $('backHome').addEventListener('click',showHome);
   $('openUpload').addEventListener('click',()=>{if(!db){alert('먼저 README의 Supabase 설정을 완료해 주세요.');return;}$('uploadDialog').showModal();});
   $('closeUpload').addEventListener('click',()=>$('uploadDialog').close());
-
   $('uploadForm').addEventListener('submit',async(e)=>{
-    e.preventDefault();const status=$('uploadStatus'),submit=$('submitUpload');const password=$('uploadPassword').value.trim(),title=$('albumName').value.trim(),cover=$('coverFile').files[0],files=[...$('photoFiles').files];
-    if(!cover||!files.length){status.textContent='대표 사진과 앨범 사진을 선택해 주세요.';return;}
-    if(files.length>20){status.textContent='앨범 사진은 최대 20장까지 올릴 수 있어요.';return;}
-    const all=[cover,...files];if(all.some(f=>!['image/jpeg','image/png','image/webp','image/gif'].includes(f.type)||f.size>6*1024*1024)){status.textContent='JPG, PNG, WEBP, GIF만 가능하며 사진 한 장은 6MB 이하여야 해요.';return;}
-    submit.disabled=true;status.textContent='업로드 준비 중…';
-    try{
-      const filesInfo=all.map((f,i)=>({name:f.name,type:f.type,size:f.size,role:i===0?'cover':'photo',sort_order:i-1}));
-      const prepare=await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload`,{method:'POST',headers:{'Content-Type':'application/json','apikey':cfg.SUPABASE_ANON_KEY},body:JSON.stringify({action:'prepare',password,title,files:filesInfo})});
-      const prep=await prepare.json();if(!prepare.ok)throw new Error(prep.error||'비밀번호 또는 업로드 준비를 확인해 주세요.');
-      for(let i=0;i<all.length;i++){status.textContent=`사진 업로드 중… ${i+1}/${all.length}`;const item=prep.uploads[i];const {error}=await db.storage.from('photos').uploadToSignedUrl(item.path,item.token,all[i],{contentType:all[i].type});if(error)throw error;}
-      status.textContent='앨범 정보 저장 중…';
-      const finish=await fetch(`${cfg.SUPABASE_URL}/functions/v1/upload`,{method:'POST',headers:{'Content-Type':'application/json','apikey':cfg.SUPABASE_ANON_KEY},body:JSON.stringify({action:'finalize',password,album_id:prep.album_id,title,uploads:prep.uploads.map((u,i)=>({path:u.path,role:i===0?'cover':'photo',sort_order:i-1}))})});
-      const done=await finish.json();if(!finish.ok)throw new Error(done.error||'앨범 저장에 실패했어요.');
-      status.textContent='업로드 완료!';$('uploadForm').reset();setTimeout(()=>{$('uploadDialog').close();status.textContent='';loadAlbums();},900);
-    }catch(err){status.textContent=err.message||'업로드 중 문제가 생겼어요.';}finally{submit.disabled=false;}
-  });
+    e.preventDefault();
 
+    const status=$('uploadStatus');
+    const submit=$('submitUpload');
+    const title=$('albumName').value.trim();
+    const cover=$('coverFile').files[0];
+    const files=[...$('photoFiles').files];
+
+    if(!title){
+      status.textContent='앨범 이름을 입력해 주세요.';
+      return;
+    }
+
+    if(!cover||!files.length){
+      status.textContent='대표 사진과 앨범 사진을 선택해 주세요.';
+      return;
+    }
+
+    if(files.length>20){
+      status.textContent='앨범 사진은 최대 20장까지 올릴 수 있어요.';
+      return;
+    }
+
+    const all=[cover,...files];
+
+    if(all.some(f=>!f.type.startsWith('image/')||f.size>15*1024*1024)){
+      status.textContent='이미지 파일만 가능하며 사진 한 장은 15MB 이하여야 해요.';
+      return;
+    }
+
+    submit.disabled=true;
+
+    try{
+      const albumId=crypto.randomUUID();
+
+      status.textContent='앨범 저장 중…';
+
+      await saveRecord('albums',{
+        id:albumId,
+        title:title,
+        cover:cover,
+        createdAt:Date.now()
+      });
+
+      for(let i=0;i<files.length;i++){
+        status.textContent=`사진 저장 중… ${i+1}/${files.length}`;
+
+        await saveRecord('photos',{
+          id:crypto.randomUUID(),
+          albumId:albumId,
+          image:files[i],
+          sortOrder:i
+        });
+      }
+
+      status.textContent='저장 완료!';
+      $('uploadForm').reset();
+
+      setTimeout(()=>{
+        $('uploadDialog').close();
+        status.textContent='';
+        loadAlbums();
+      },900);
+
+    }catch(err){
+      status.textContent='저장 중 문제가 발생했어요: '+err.message;
+    }finally{
+      submit.disabled=false;
+    }
+  });
   const viewer=$('viewer'),stage=$('viewerStage'),img=$('viewerImage');
   function applyTransform(){img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;}
   function resetZoom(){scale=1;tx=0;ty=0;applyTransform();}
