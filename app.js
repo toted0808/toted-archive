@@ -29,6 +29,10 @@
   }
   function showHome(){albumView.classList.add('hidden');homeView.classList.remove('hidden');currentAlbum=null;history.replaceState(null,'','#home');}
   $('backHome').addEventListener('click',showHome);
+  $('brandHome').addEventListener('click',e=>{
+  e.preventDefault();
+  showHome();
+});
   $('openUpload').addEventListener('click',()=>{if(!db){alert('먼저 README의 Supabase 설정을 완료해 주세요.');return;}$('uploadDialog').showModal();});
   $('closeUpload').addEventListener('click',()=>$('uploadDialog').close());
 
