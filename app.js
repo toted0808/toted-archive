@@ -7,8 +7,52 @@
   let currentAlbum=null, currentPhotos=[], viewerIndex=0, scale=1, tx=0, ty=0, pointers=new Map(), startPoint=null, pinchStart=0, pinchDistance=0;
   const publicUrl=(path)=>db.storage.from('photos').getPublicUrl(path).data.publicUrl;
   const escapeHtml=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // 아이폰 브라우저 내부 사진 저장소
+  let archiveDB;
 
-  async function loadAlbums(){
+  function openArchiveDB(){
+    return new Promise((resolve,reject)=>{
+      const request=indexedDB.open('totedArchive',1);
+
+      request.onupgradeneeded=()=>{
+        const db=request.result;
+
+        if(!db.objectStoreNames.contains('albums')){
+          db.createObjectStore('albums',{keyPath:'id'});
+        }
+
+        if(!db.objectStoreNames.contains('photos')){
+          const photos=db.createObjectStore('photos',{keyPath:'id'});
+          photos.createIndex('albumId','albumId',{unique:false});
+        }
+      };
+
+      request.onsuccess=()=>{
+        archiveDB=request.result;
+        resolve(archiveDB);
+      };
+
+      request.onerror=()=>reject(request.error);
+    });
+  }
+
+  function saveRecord(storeName,record){
+    return new Promise((resolve,reject)=>{
+      const tx=archiveDB.transaction(storeName,'readwrite');
+      tx.objectStore(storeName).put(record);
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    });
+  }
+
+  function getAllRecords(storeName){
+    return new Promise((resolve,reject)=>{
+      const tx=archiveDB.transaction(storeName,'readonly');
+      const request=tx.objectStore(storeName).getAll();
+      request.onsuccess=()=>resolve(request.result);
+      request.onerror=()=>reject(request.error);
+    });
+  }  async function loadAlbums(){
     if(!db){albumList.innerHTML='<div class="loading">아직 Supabase 연결 전이에요.<br>README 안내에 따라 설정을 마치면 앨범이 표시됩니다.</div>';return;}
     const {data,error}=await db.from('albums').select('id,title,cover_path,created_at').order('created_at',{ascending:false});
     if(error){albumList.innerHTML='<div class="loading">앨범을 불러오지 못했어요. Supabase 설정을 확인해 주세요.</div>';return;}
