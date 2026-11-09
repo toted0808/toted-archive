@@ -1,5 +1,4 @@
 
-
 const $ = (id) => document.getElementById(id);
 
 const DB_NAME = 'totedArchive';
@@ -12,6 +11,20 @@ let currentAlbum = null;
 let currentPhotos = [];
 let currentPhotoIndex = 0;
 let objectUrls = [];
+
+let scale = 1;
+let translateX = 0;
+let translateY = 0;
+let pointers = new Map();
+let startDistance = 0;
+let startScale = 1;
+let startX = 0;
+let startY = 0;
+let startTranslateX = 0;
+let startTranslateY = 0;
+let swipeStartX = 0;
+let swipeStartY = 0;
+let lastTap = 0;
 
 function createId() {
   return crypto.randomUUID();
@@ -74,11 +87,9 @@ function getAlbumPhotos(albumId) {
     const request = index.getAll(albumId);
 
     request.onsuccess = () => {
-      const photos = request.result.sort(
-        (a, b) => a.sortOrder - b.sortOrder
+      resolve(
+        request.result.sort((a, b) => a.sortOrder - b.sortOrder)
       );
-
-      resolve(photos);
     };
 
     request.onerror = () => reject(request.error);
@@ -126,14 +137,7 @@ async function deleteAlbum(album) {
 
     albumStore.delete(album.id);
 
-    photoStore.delete(
-      IDBKeyRange.only(album.id)
-    );
-
-    // 위 코드는 사진의 기본 키가 albumId인 경우에만 작동하므로,
-    // 실제 사진 ID를 순회해서 삭제한다.
-    const photoIndex = photoStore.index('albumId');
-    const request = photoIndex.openCursor(
+    const request = photoStore.index('albumId').openCursor(
       IDBKeyRange.only(album.id)
     );
 
@@ -154,7 +158,6 @@ async function deleteAlbum(album) {
 
     currentAlbum = null;
     currentPhotos = [];
-
     clearUrls();
 
     await showHome();
@@ -165,6 +168,7 @@ async function deleteAlbum(album) {
   }
 }
 
+// 앨범 목록
 async function loadAlbums() {
   clearUrls();
 
@@ -175,10 +179,11 @@ async function loadAlbums() {
 
   if (albums.length === 0) {
     $('homeMessage').textContent = '아직 등록된 앨범이 없습니다.';
+    $('homeMessage').classList.remove('hidden');
     return;
   }
 
-  $('homeMessage').textContent = '';
+  $('homeMessage').classList.add('hidden');
 
   albums.sort((a, b) => b.createdAt - a.createdAt);
 
@@ -202,9 +207,7 @@ async function loadAlbums() {
 
     card.append(cover, title, meta);
 
-    card.addEventListener('click', () => {
-      openAlbum(album);
-    });
+    card.addEventListener('click', () => openAlbum(album));
 
     list.appendChild(card);
   }
@@ -239,33 +242,25 @@ async function openAlbum(album) {
 
   $('albumCover').appendChild(coverImage);
 
-  $('photoCount').textContent =
-    `${currentPhotos.length} PHOTOS`;
+  $('photoCount').textContent = `${currentPhotos.length} PHOTOS`;
 
-  // 삭제 버튼 생성 및 표시
   let deleteButton = $('deleteAlbum');
 
   if (!deleteButton) {
     deleteButton = document.createElement('button');
-
     deleteButton.id = 'deleteAlbum';
     deleteButton.type = 'button';
     deleteButton.className = 'back-button delete-album-button';
     deleteButton.textContent = '앨범 삭제';
 
     deleteButton.addEventListener('click', () => {
-      if (currentAlbum) {
-        deleteAlbum(currentAlbum);
-      }
+      if (currentAlbum) deleteAlbum(currentAlbum);
     });
   }
 
-  // 제목과 사진 수가 있는 영역에 버튼 추가
-  const heading = $('albumTitle').parentElement;
-  heading.appendChild(deleteButton);
+  $('albumTitle').parentElement.appendChild(deleteButton);
   deleteButton.hidden = false;
 
-  // 사진 목록
   const grid = $('photoGrid');
   grid.innerHTML = '';
 
@@ -280,9 +275,7 @@ async function openAlbum(album) {
 
     button.appendChild(image);
 
-    button.addEventListener('click', () => {
-      openViewer(index);
-    });
+    button.addEventListener('click', () => openViewer(index));
 
     grid.appendChild(button);
   });
@@ -296,10 +289,8 @@ function validateImage(file) {
     'image/gif'
   ];
 
-  return (
-    allowedTypes.includes(file.type) &&
-    file.size <= MAX_FILE_SIZE
-  );
+  return allowedTypes.includes(file.type) &&
+    file.size <= MAX_FILE_SIZE;
 }
 
 // 사진 업로드
@@ -318,13 +309,8 @@ async function handleUpload(event) {
     return;
   }
 
-  if (!coverFile) {
-    status.textContent = '앨범 대표 사진을 선택해 주세요.';
-    return;
-  }
-
-  if (!validateImage(coverFile)) {
-    status.textContent = '대표 사진은 JPG, PNG, WEBP, GIF 형식이며 6MB 이하여야 합니다.';
+  if (!coverFile || !validateImage(coverFile)) {
+    status.textContent = '올바른 대표 사진을 선택해 주세요. (6MB 이하)';
     return;
   }
 
@@ -334,21 +320,16 @@ async function handleUpload(event) {
   }
 
   if (photoFiles.length > MAX_PHOTOS) {
-    status.textContent = `사진은 한 번에 최대 ${MAX_PHOTOS}장까지 등록할 수 있습니다.`;
+    status.textContent = `사진은 최대 ${MAX_PHOTOS}장까지 등록할 수 있습니다.`;
     return;
   }
 
-  const invalidFile = photoFiles.find(
-    (file) => !validateImage(file)
-  );
-
-  if (invalidFile) {
+  if (photoFiles.some((file) => !validateImage(file))) {
     status.textContent = '사진은 JPG, PNG, WEBP, GIF 형식이며 각각 6MB 이하여야 합니다.';
     return;
   }
 
   const submitButton = $('submitUpload');
-
   submitButton.disabled = true;
   status.textContent = '사진을 저장하고 있습니다...';
 
@@ -385,25 +366,44 @@ async function handleUpload(event) {
   }
 }
 
-// 사진 뷰어
+// 확대 상태 초기화
+function resetZoom() {
+  scale = 1;
+  translateX = 0;
+  translateY = 0;
+  pointers.clear();
+
+  applyZoom();
+}
+
+function applyZoom() {
+  $('viewerImage').style.transform =
+    `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+}
+
+// 사진 뷰어 열기
 function openViewer(index) {
   currentPhotoIndex = index;
 
   $('viewer').classList.remove('hidden');
 
+  resetZoom();
   updateViewer();
-
-  $('viewer').focus();
 }
 
+// 사진 뷰어 닫기
 function closeViewer() {
   $('viewer').classList.add('hidden');
+  resetZoom();
 }
 
+// 사진 표시
 function updateViewer() {
   const photo = currentPhotos[currentPhotoIndex];
 
   if (!photo) return;
+
+  resetZoom();
 
   $('viewerImage').src = createObjectUrl(photo.blob);
 
@@ -411,6 +411,7 @@ function updateViewer() {
     `${currentPhotoIndex + 1} / ${currentPhotos.length}`;
 }
 
+// 다음 사진
 function nextPhoto() {
   if (currentPhotoIndex < currentPhotos.length - 1) {
     currentPhotoIndex++;
@@ -418,6 +419,7 @@ function nextPhoto() {
   }
 }
 
+// 이전 사진
 function previousPhoto() {
   if (currentPhotoIndex > 0) {
     currentPhotoIndex--;
@@ -425,47 +427,148 @@ function previousPhoto() {
   }
 }
 
-function setupViewer() {
-  $('closeViewer').addEventListener('click', closeViewer);
+function getDistance(a, b) {
+  return Math.hypot(
+    a.x - b.x,
+    a.y - b.y
+  );
+}
 
-  $('viewer').addEventListener('click', (event) => {
-    if (event.target === $('viewer')) {
-      closeViewer();
+// 확대 및 이동 제어
+function setupZoom() {
+  const stage = $('viewerStage');
+  const image = $('viewerImage');
+
+  stage.addEventListener('pointerdown', (event) => {
+    if ($('viewer').classList.contains('hidden')) return;
+
+    stage.setPointerCapture(event.pointerId);
+
+    pointers.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY
+    });
+
+    if (pointers.size === 1) {
+      startX = event.clientX;
+      startY = event.clientY;
+      startTranslateX = translateX;
+      startTranslateY = translateY;
+      swipeStartX = event.clientX;
+      swipeStartY = event.clientY;
+    }
+
+    if (pointers.size === 2) {
+      const points = [...pointers.values()];
+      startDistance = getDistance(points[0], points[1]);
+      startScale = scale;
     }
   });
+
+  stage.addEventListener('pointermove', (event) => {
+    if (!pointers.has(event.pointerId)) return;
+
+    pointers.set(event.pointerId, {
+      x: event.clientX,
+      y: event.clientY
+    });
+
+    if (pointers.size === 2) {
+      const points = [...pointers.values()];
+      const distance = getDistance(points[0], points[1]);
+
+      if (startDistance > 0) {
+        scale = Math.min(
+          5,
+          Math.max(1, startScale * distance / startDistance)
+        );
+
+        applyZoom();
+      }
+
+      return;
+    }
+
+    if (pointers.size === 1 && scale > 1) {
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+
+      translateX = startTranslateX + dx;
+      translateY = startTranslateY + dy;
+
+      applyZoom();
+    }
+  });
+
+  function pointerEnd(event) {
+    if (!pointers.has(event.pointerId)) return;
+
+    const point = pointers.get(event.pointerId);
+
+    pointers.delete(event.pointerId);
+
+    if (pointers.size === 0) {
+      if (scale === 1) {
+        const dx = point.x - swipeStartX;
+        const dy = point.y - swipeStartY;
+
+        if (
+          Math.abs(dx) > 50 &&
+          Math.abs(dx) > Math.abs(dy)
+        ) {
+          if (dx < 0) nextPhoto();
+          else previousPhoto();
+        }
+      }
+
+      startDistance = 0;
+    }
+  }
+
+  stage.addEventListener('pointerup', pointerEnd);
+  stage.addEventListener('pointercancel', pointerEnd);
+
+  image.addEventListener('dblclick', () => {
+    if (scale > 1) {
+      resetZoom();
+    } else {
+      scale = 2.5;
+      applyZoom();
+    }
+  });
+
+  stage.addEventListener('click', (event) => {
+    const now = Date.now();
+
+    if (now - lastTap < 300) {
+      if (scale > 1) {
+        resetZoom();
+      } else {
+        scale = 2.5;
+        applyZoom();
+      }
+    }
+
+    lastTap = now;
+  });
+}
+
+// 뷰어 설정
+function setupViewer() {
+  $('closeViewer').addEventListener('click', closeViewer);
 
   document.addEventListener('keydown', (event) => {
     if ($('viewer').classList.contains('hidden')) return;
 
     if (event.key === 'Escape') closeViewer();
-    if (event.key === 'ArrowRight') nextPhoto();
-    if (event.key === 'ArrowLeft') previousPhoto();
+
+    if (scale === 1) {
+      if (event.key === 'ArrowRight') nextPhoto();
+      if (event.key === 'ArrowLeft') previousPhoto();
+    }
   });
 
-  let startX = 0;
-  let startY = 0;
-
-  $('viewerStage').addEventListener('touchstart', (event) => {
-    const touch = event.touches[0];
-
-    startX = touch.clientX;
-    startY = touch.clientY;
-  }, { passive: true });
-
-  $('viewerStage').addEventListener('touchend', (event) => {
-    const touch = event.changedTouches[0];
-
-    const diffX = touch.clientX - startX;
-    const diffY = touch.clientY - startY;
-
-    if (
-      Math.abs(diffX) > 50 &&
-      Math.abs(diffX) > Math.abs(diffY)
-    ) {
-      if (diffX < 0) nextPhoto();
-      else previousPhoto();
-    }
-  }, { passive: true });
+  setupZoom();
 }
 
 // 업로드 창
@@ -502,3 +605,4 @@ async function init() {
 }
 
 init();
+
