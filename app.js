@@ -180,16 +180,24 @@ async function deleteAlbum(album) {
 }
 
 // 검색어와 일치하는 앨범 찾기
+// 검색어 정리
+function normalizeSearchText(text) {
+  return String(text)
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .toLocaleLowerCase();
+}
+
+// 검색어와 일치하는 앨범 찾기
 function getMatchingAlbums(query) {
-  const keyword = query.trim().toLocaleLowerCase();
+  const keyword = normalizeSearchText(query);
 
   if (!keyword) return albumCache;
 
   return albumCache.filter((album) =>
-    album.title.toLocaleLowerCase().includes(keyword)
+    normalizeSearchText(album.title).includes(keyword)
   );
 }
-
 // 자동완성 추천 목록 표시
 function renderSuggestions(query) {
   const suggestions = $('searchSuggestions');
