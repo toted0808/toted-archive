@@ -53,23 +53,70 @@
       request.onerror=()=>reject(request.error);
     });
   }  async function loadAlbums(){
-    if(!db){albumList.innerHTML='<div class="loading">아직 Supabase 연결 전이에요.<br>README 안내에 따라 설정을 마치면 앨범이 표시됩니다.</div>';return;}
-    const {data,error}=await db.from('albums').select('id,title,cover_path,created_at').order('created_at',{ascending:false});
-    if(error){albumList.innerHTML='<div class="loading">앨범을 불러오지 못했어요. Supabase 설정을 확인해 주세요.</div>';return;}
-    albumList.innerHTML='';$('homeMessage').classList.toggle('hidden',data.length!==0);
-    data.forEach(album=>{
-      const button=document.createElement('button');button.className='album-card';button.type='button';
-      button.innerHTML=`<img loading="lazy" src="${publicUrl(album.cover_path)}" alt=""><h2>${escapeHtml(album.title)}</h2><p class="album-meta">PHOTO COLLECTION</p>`;
-      button.addEventListener('click',()=>openAlbum(album));albumList.append(button);
+  const albums=await getAllRecords('albums');
+
+  albumList.innerHTML='';
+  $('homeMessage').classList.toggle('hidden',albums.length!==0);
+
+  albums.sort((a,b)=>b.createdAt-a.createdAt);
+
+  albums.forEach(album=>{
+    const button=document.createElement('button');
+    button.className='album-card';
+    button.type='button';
+
+    const imageUrl=URL.createObjectURL(album.cover);
+
+    button.innerHTML=`
+      <img loading="lazy" src="${imageUrl}" alt="">
+      <h2>${escapeHtml(album.title)}</h2>
+      <p class="album-meta">PHOTO COLLECTION</p>
+    `;
+
+    button.addEventListener('click',()=>openAlbum(album));
+    albumList.append(button);
+  });
+}
+
+async function openAlbum(album){
+  currentAlbum=album;
+  homeView.classList.add('hidden');
+  albumView.classList.remove('hidden');
+
+  $('albumTitle').textContent=album.title;
+  $('albumCover').innerHTML='';
+
+  const coverUrl=URL.createObjectURL(album.cover);
+  const coverImage=document.createElement('img');
+  coverImage.src=coverUrl;
+  $('albumCover').append(coverImage);
+
+  photoGrid.innerHTML='<div class="loading">사진을 불러오는 중…</div>';
+
+  const tx=archiveDB.transaction('photos','readonly');
+  const request=tx.objectStore('photos').index('albumId').getAll(album.id);
+
+  request.onsuccess=()=>{
+    currentPhotos=request.result
+      .sort((a,b)=>a.sortOrder-b.sortOrder)
+      .map(photo=>({
+        ...photo,
+        url:URL.createObjectURL(photo.image)
+      }));
+
+    $('photoCount').textContent=`${currentPhotos.length} PHOTOS`;
+    photoGrid.innerHTML='';
+
+    currentPhotos.forEach((photo,index)=>{
+      const button=document.createElement('button');
+      button.className='photo-cell';
+      button.type='button';
+      button.innerHTML=`<img loading="lazy" src="${photo.url}" alt="사진 ${index+1}">`;
+      button.addEventListener('click',()=>showViewer(index));
+      photoGrid.append(button);
     });
-  }
-  async function openAlbum(album){
-    currentAlbum=album;homeView.classList.add('hidden');albumView.classList.remove('hidden');$('albumTitle').textContent=album.title;$('albumCover').innerHTML=`<img src="${publicUrl(album.cover_path)}" alt="">`;
-    photoGrid.innerHTML='<div class="loading">사진을 불러오는 중…</div>';
-    const {data,error}=await db.from('photos').select('id,storage_path,sort_order').eq('album_id',album.id).order('sort_order');
-    if(error){photoGrid.innerHTML='<p class="loading">사진을 불러오지 못했어요.</p>';return;}
-    currentPhotos=data.map(p=>({...p,url:publicUrl(p.storage_path)}));$('photoCount').textContent=`${data.length} PHOTOS`;photoGrid.innerHTML='';
-    currentPhotos.forEach((photo,index)=>{const b=document.createElement('button');b.className='photo-cell';b.type='button';b.innerHTML=`<img loading="lazy" src="${photo.url}" alt="사진 ${index+1}">`;b.addEventListener('click',()=>showViewer(index));photoGrid.append(b);});
+  };
+}
   }
   function showHome(){albumView.classList.add('hidden');homeView.classList.remove('hidden');currentAlbum=null;history.replaceState(null,'','#home');}
   $('backHome').addEventListener('click',showHome);
