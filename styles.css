@@ -5,3 +5,11 @@
   border-color: #653b3b;
   margin-top: 16px;
 }
+.viewer-stage {
+  touch-action: none;
+}
+
+.viewer-stage img {
+  touch-action: none;
+  cursor: grab;
+}
