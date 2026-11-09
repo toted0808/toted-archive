@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ko">
 <head>
@@ -23,11 +22,42 @@
       <p class="subtext">앨범을 열어 사진을 살펴보세요.</p>
     </section>
 
+    <!-- 앨범 검색 -->
+    <section class="search-section">
+      <div class="search-box">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input
+          id="albumSearch"
+          type="search"
+          placeholder="앨범 제목 검색"
+          autocomplete="off"
+          aria-label="앨범 제목 검색"
+          aria-controls="searchSuggestions"
+          aria-autocomplete="list"
+        >
+        <button
+          id="clearSearch"
+          class="search-clear hidden"
+          type="button"
+          aria-label="검색어 지우기"
+        >×</button>
+      </div>
+
+      <div
+        id="searchSuggestions"
+        class="search-suggestions hidden"
+        role="listbox"
+        aria-label="검색 추천"
+      ></div>
+    </section>
+
     <div id="albumList" class="album-list" aria-live="polite">
       <div class="loading">앨범을 불러오는 중…</div>
     </div>
 
-    <p id="homeMessage" class="empty-message hidden">아직 앨범이 없어요.<br>첫 번째 앨범을 만들어 보세요.</p>
+    <p id="homeMessage" class="empty-message hidden">
+      아직 앨범이 없어요.<br>첫 번째 앨범을 만들어 보세요.
+    </p>
   </main>
 
   <main id="albumView" class="view hidden">
