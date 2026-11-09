@@ -1,4 +1,3 @@
-
 const $ = (id) => document.getElementById(id);
 
 const DB_NAME = 'totedArchive';
@@ -10,10 +9,12 @@ let currentAlbum = null;
 let currentPhotos = [];
 let currentPhotoIndex = 0;
 let objectUrls = [];
+let viewerUrl = null;
 
 let scale = 1;
 let translateX = 0;
 let translateY = 0;
+
 let pointers = new Map();
 let startDistance = 0;
 let startScale = 1;
@@ -23,6 +24,7 @@ let startTranslateX = 0;
 let startTranslateY = 0;
 let swipeStartX = 0;
 let swipeStartY = 0;
+let gestureHadMultiplePointers = false;
 let lastTap = 0;
 
 function createId() {
@@ -38,6 +40,13 @@ function createObjectUrl(blob) {
 function clearUrls() {
   objectUrls.forEach((url) => URL.revokeObjectURL(url));
   objectUrls = [];
+}
+
+function clearViewerUrl() {
+  if (viewerUrl) {
+    URL.revokeObjectURL(viewerUrl);
+    viewerUrl = null;
+  }
 }
 
 function openDatabase() {
@@ -216,8 +225,11 @@ async function showHome() {
   currentAlbum = null;
   currentPhotos = [];
 
+  clearViewerUrl();
+
   $('homeView').classList.remove('hidden');
   $('albumView').classList.add('hidden');
+  $('viewer').classList.add('hidden');
 
   await loadAlbums();
 }
@@ -319,7 +331,8 @@ async function handleUpload(event) {
   }
 
   if (photoFiles.some((file) => !validateImage(file))) {
-    status.textContent = '사진은 JPG, PNG, WEBP, GIF 형식이며 각각 6MB 이하여야 합니다.';
+    status.textContent =
+      '사진은 JPG, PNG, WEBP, GIF 형식이며 각각 6MB 이하여야 합니다.';
     return;
   }
 
@@ -365,7 +378,10 @@ function resetZoom() {
   scale = 1;
   translateX = 0;
   translateY = 0;
+
   pointers.clear();
+  startDistance = 0;
+  gestureHadMultiplePointers = false;
 
   applyZoom();
 }
@@ -388,6 +404,8 @@ function openViewer(index) {
 // 사진 뷰어 닫기
 function closeViewer() {
   $('viewer').classList.add('hidden');
+
+  clearViewerUrl();
   resetZoom();
 }
 
@@ -398,8 +416,10 @@ function updateViewer() {
   if (!photo) return;
 
   resetZoom();
+  clearViewerUrl();
 
-  $('viewerImage').src = createObjectUrl(photo.blob);
+  viewerUrl = URL.createObjectURL(photo.blob);
+  $('viewerImage').src = viewerUrl;
 
   $('viewerCounter').textContent =
     `${currentPhotoIndex + 1} / ${currentPhotos.length}`;
@@ -428,13 +448,26 @@ function getDistance(a, b) {
   );
 }
 
+// 더블 탭 확대/축소
+function toggleZoom() {
+  if (scale > 1) {
+    resetZoom();
+  } else {
+    scale = 2.5;
+    translateX = 0;
+    translateY = 0;
+    applyZoom();
+  }
+}
+
 // 확대 및 이동 제어
 function setupZoom() {
   const stage = $('viewerStage');
-  const image = $('viewerImage');
 
   stage.addEventListener('pointerdown', (event) => {
     if ($('viewer').classList.contains('hidden')) return;
+
+    event.preventDefault();
 
     stage.setPointerCapture(event.pointerId);
 
@@ -446,14 +479,19 @@ function setupZoom() {
     if (pointers.size === 1) {
       startX = event.clientX;
       startY = event.clientY;
+
       startTranslateX = translateX;
       startTranslateY = translateY;
+
       swipeStartX = event.clientX;
       swipeStartY = event.clientY;
     }
 
-    if (pointers.size === 2) {
+    if (pointers.size >= 2) {
+      gestureHadMultiplePointers = true;
+
       const points = [...pointers.values()];
+
       startDistance = getDistance(points[0], points[1]);
       startScale = scale;
     }
@@ -462,12 +500,14 @@ function setupZoom() {
   stage.addEventListener('pointermove', (event) => {
     if (!pointers.has(event.pointerId)) return;
 
+    event.preventDefault();
+
     pointers.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY
     });
 
-    if (pointers.size === 2) {
+    if (pointers.size >= 2) {
       const points = [...pointers.values()];
       const distance = getDistance(points[0], points[1]);
 
@@ -483,7 +523,11 @@ function setupZoom() {
       return;
     }
 
-    if (pointers.size === 1 && scale > 1) {
+    if (
+      pointers.size === 1 &&
+      scale > 1 &&
+      !gestureHadMultiplePointers
+    ) {
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
 
@@ -501,50 +545,52 @@ function setupZoom() {
 
     pointers.delete(event.pointerId);
 
-    if (pointers.size === 0) {
-      if (scale === 1) {
-        const dx = point.x - swipeStartX;
-        const dy = point.y - swipeStartY;
+    if (pointers.size > 0) {
+      return;
+    }
 
-        if (
-          Math.abs(dx) > 50 &&
-          Math.abs(dx) > Math.abs(dy)
-        ) {
-          if (dx < 0) nextPhoto();
-          else previousPhoto();
-        }
+    if (!gestureHadMultiplePointers) {
+      const dx = point.x - swipeStartX;
+      const dy = point.y - swipeStartY;
+
+      const moved = Math.abs(dx) > 10 || Math.abs(dy) > 10;
+
+      // 좌우 밀기로 사진 넘기기
+      if (
+        scale === 1 &&
+        Math.abs(dx) > 50 &&
+        Math.abs(dx) > Math.abs(dy)
+      ) {
+        if (dx < 0) nextPhoto();
+        else previousPhoto();
+
+        lastTap = 0;
+        startDistance = 0;
+        return;
       }
 
-      startDistance = 0;
+      // 두 번 탭으로 확대/축소
+      if (
+        event.pointerType === 'touch' &&
+        !moved
+      ) {
+        const now = Date.now();
+
+        if (now - lastTap < 300) {
+          toggleZoom();
+          lastTap = 0;
+        } else {
+          lastTap = now;
+        }
+      }
     }
+
+    startDistance = 0;
+    gestureHadMultiplePointers = false;
   }
 
   stage.addEventListener('pointerup', pointerEnd);
   stage.addEventListener('pointercancel', pointerEnd);
-
-  image.addEventListener('dblclick', () => {
-    if (scale > 1) {
-      resetZoom();
-    } else {
-      scale = 2.5;
-      applyZoom();
-    }
-  });
-
-  stage.addEventListener('click', (event) => {
-    const now = Date.now();
-
-    if (now - lastTap < 300) {
-      if (scale > 1) {
-        resetZoom();
-      } else {
-        scale = 2.5;
-        applyZoom();
-      }
-    }
-
-    lastTap = now;
-  });
 }
 
 // 뷰어 설정
@@ -599,4 +645,3 @@ async function init() {
 }
 
 init();
-
