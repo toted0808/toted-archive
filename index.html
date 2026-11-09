@@ -1,70 +1,77 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#111111">
-  <meta name="description" content="toted archive — personal photo archive">
   <title>toted archive</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#home" aria-label="toted archive 홈">toted <span>archive</span></a>
-    <button id="openUpload" class="upload-trigger" type="button">＋ 업로드</button>
+    <div class="brand" id="brandHome">
+      <h1>toted archive</h1>
+      <p>기억을 모으는 곳</p>
+    </div>
+    <button id="uploadOpen" class="primary-btn">+ 앨범 만들기</button>
   </header>
 
-  <main id="homeView" class="view">
-    <section class="intro">
-      <p class="eyebrow">PERSONAL PHOTO ARCHIVE</p>
-      <h1>기억을 모으는 곳<span>.</span></h1>
-      <p class="subtext">앨범을 열어 사진을 살펴보세요.</p>
-    </section>
-    <div id="albumList" class="album-list" aria-live="polite">
-      <div class="loading">앨범을 불러오는 중…</div>
-    </div>
-    <p id="homeMessage" class="empty-message hidden">아직 앨범이 없어요.<br>첫 번째 앨범을 만들어 보세요.</p>
-  </main>
-
-  <main id="albumView" class="view hidden">
-    <button id="backHome" class="back-button" type="button">← 전체 앨범</button>
-    <section class="album-heading">
-      <div id="albumCover" class="album-cover"></div>
-      <p class="eyebrow">PHOTO COLLECTION</p>
-      <h1 id="albumTitle"></h1>
-      <p id="photoCount" class="subtext"></p>
-    </section>
-    <div id="photoGrid" class="photo-grid"></div>
-  </main>
-
-  <dialog id="uploadDialog" class="dialog">
-    <form id="uploadForm" class="upload-form">
-      <div class="dialog-head">
-        <div><p class="eyebrow">NEW COLLECTION</p><h2>앨범 업로드</h2></div>
-        <button id="closeUpload" class="icon-button" type="button" aria-label="닫기">×</button>
+  <main>
+    <section id="homeView" class="view">
+      <div class="section-heading">
+        <h2>나의 앨범</h2>
+        <span id="albumCount">0개의 앨범</span>
       </div>
-      <label>업로드 비밀번호<input id="uploadPassword" type="password" autocomplete="current-password" required placeholder="비밀번호"></label>
-      <label>앨범 제목<input id="albumName" type="text" maxlength="80" required placeholder="예: 여름의 기록"></label>
-      <label>대표 사진<input id="coverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
-      <label>앨범 사진 <span class="hint">최대 20장 · 사진 한 장당 6MB 이하</span><input id="photoFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple required></label>
-      <p id="uploadStatus" class="status" role="status"></p>
-      <button id="submitUpload" class="primary-button" type="submit">앨범 만들기</button>
-      <p class="fine-print">업로드한 사진은 공개적으로 열람할 수 있습니다.</p>
-    </form>
-  </dialog>
+      <div id="albumList" class="album-list"></div>
+      <div id="emptyState" class="empty-state">
+        <p>아직 앨범이 없어.</p>
+        <p>첫 번째 기억을 모아보자.</p>
+      </div>
+    </section>
 
-  <div id="viewer" class="viewer hidden" aria-label="사진 보기">
-    <button id="closeViewer" class="viewer-close" type="button" aria-label="닫기">×</button>
-    <div id="viewerStage" class="viewer-stage">
-      <img id="viewerImage" alt="확대된 사진" draggable="false">
+    <section id="albumView" class="view hidden">
+      <button id="backHome" class="text-btn">← 앨범 목록</button>
+      <div class="section-heading">
+        <div>
+          <h2 id="albumTitle"></h2>
+          <p id="albumDescription"></p>
+        </div>
+        <span id="photoCount"></span>
+      </div>
+      <div id="photoGrid" class="photo-grid"></div>
+    </section>
+  </main>
+
+  <div id="uploadModal" class="modal hidden">
+    <div class="modal-content">
+      <button id="uploadClose" class="close-btn" aria-label="닫기">×</button>
+      <h2>새 앨범 만들기</h2>
+      <form id="uploadForm">
+        <label for="albumName">앨범 이름</label>
+        <input id="albumName" name="albumName" type="text" required maxlength="60" placeholder="앨범 이름">
+
+        <label for="albumDesc">설명</label>
+        <textarea id="albumDesc" name="albumDesc" maxlength="200" placeholder="앨범에 대한 설명 (선택)"></textarea>
+
+        <label for="photoFiles">사진 선택</label>
+        <input id="photoFiles" name="photos" type="file" accept="image/*" multiple required>
+
+        <p class="form-note">사진은 현재 사용 중인 브라우저에 저장돼.</p>
+        <button type="submit" class="primary-btn">앨범 저장하기</button>
+      </form>
+      <p id="uploadStatus" role="status"></p>
     </div>
-    <div id="viewerCounter" class="viewer-counter"></div>
-    <p class="viewer-help">두 손가락으로 확대 · 위로 밀기: 이전 사진 · 아래로 밀기: 다음 사진</p>
   </div>
 
-  <footer>toted archive <span>·</span> a place for photographs</footer>
+  <div id="viewer" class="viewer hidden">
+    <button id="viewerClose" class="viewer-close" aria-label="닫기">×</button>
+    <button id="viewerPrev" class="viewer-nav viewer-prev" aria-label="이전 사진">‹</button>
+    <img id="viewerImage" alt="선택한 사진">
+    <button id="viewerNext" class="viewer-nav viewer-next" aria-label="다음 사진">›</button>
+    <div id="viewerCounter" class="viewer-counter"></div>
+  </div>
+
+  <script src="app.js" defer></script>
 </body>
 </html>
