@@ -1,6 +1,6 @@
 # toted archive
 
-모바일 우선 사진 아카이브. GitHub Pages + Supabase 무료 요금제에서 시작하도록 만든 기본 프로젝트입니다.
+모바일 우선 사진 아카이브. GitHub Pages 기본 프로젝트입니다.
 
 ## 들어 있는 기능
 - 어두운 테마의 세로형 앨범 목록
