@@ -11,6 +11,9 @@ let currentPhotoIndex = 0;
 let objectUrls = [];
 let viewerUrl = null;
 
+let albumCache = [];
+let albumRenderId = 0;
+
 let scale = 1;
 let translateX = 0;
 let translateY = 0;
@@ -176,28 +179,101 @@ async function deleteAlbum(album) {
   }
 }
 
-// 앨범 목록
-async function loadAlbums() {
-  clearUrls();
+// 검색어와 일치하는 앨범 찾기
+function getMatchingAlbums(query) {
+  const keyword = query.trim().toLocaleLowerCase();
 
-  const albums = await getAllAlbums();
-  const list = $('albumList');
+  if (!keyword) return albumCache;
 
-  list.innerHTML = '';
+  return albumCache.filter((album) =>
+    album.title.toLocaleLowerCase().includes(keyword)
+  );
+}
 
-  if (albums.length === 0) {
-    $('homeMessage').textContent = '아직 등록된 앨범이 없습니다.';
-    $('homeMessage').classList.remove('hidden');
+// 자동완성 추천 목록 표시
+function renderSuggestions(query) {
+  const suggestions = $('searchSuggestions');
+  const keyword = query.trim();
+
+  suggestions.innerHTML = '';
+
+  if (!keyword) {
+    suggestions.classList.add('hidden');
     return;
   }
 
-  $('homeMessage').classList.add('hidden');
+  const matches = getMatchingAlbums(keyword).slice(0, 6);
 
-  albums.sort((a, b) => b.createdAt - a.createdAt);
+  if (matches.length === 0) {
+    suggestions.classList.add('hidden');
+    return;
+  }
 
-  for (const album of albums) {
-    const photos = await getAlbumPhotos(album.id);
+  matches.forEach((album) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'suggestion-item';
+    button.setAttribute('role', 'option');
 
+    const icon = document.createElement('span');
+    icon.className = 'suggestion-icon';
+    icon.textContent = '⌕';
+
+    const title = document.createElement('span');
+    title.className = 'suggestion-title';
+    title.textContent = album.title;
+
+    button.append(icon, title);
+
+    button.addEventListener('click', () => {
+      $('albumSearch').value = album.title;
+      $('clearSearch').classList.remove('hidden');
+      suggestions.classList.add('hidden');
+      openAlbum(album);
+    });
+
+    suggestions.appendChild(button);
+  });
+
+  suggestions.classList.remove('hidden');
+}
+
+// 앨범 목록 그리기
+async function renderAlbumList(query = '') {
+  const renderId = ++albumRenderId;
+
+  clearUrls();
+
+  const list = $('albumList');
+  const message = $('homeMessage');
+
+  list.innerHTML = '';
+
+  const matchingAlbums = getMatchingAlbums(query);
+
+  if (matchingAlbums.length === 0) {
+    message.textContent = query.trim()
+      ? '검색 결과가 없습니다.'
+      : '아직 등록된 앨범이 없습니다.';
+
+    message.classList.remove('hidden');
+    return;
+  }
+
+  message.classList.add('hidden');
+
+  // 사진 개수를 미리 가져온다.
+  const albumData = await Promise.all(
+    matchingAlbums.map(async (album) => ({
+      album,
+      photos: await getAlbumPhotos(album.id)
+    }))
+  );
+
+  // 빠르게 검색어를 바꿨을 때 오래된 결과가 덮어쓰지 않도록 한다.
+  if (renderId !== albumRenderId) return;
+
+  albumData.forEach(({ album, photos }) => {
     const card = document.createElement('button');
     card.className = 'album-card';
     card.type = 'button';
@@ -218,7 +294,26 @@ async function loadAlbums() {
     card.addEventListener('click', () => openAlbum(album));
 
     list.appendChild(card);
-  }
+  });
+}
+
+// 검색 기능
+function handleSearch() {
+  const query = $('albumSearch').value;
+
+  $('clearSearch').classList.toggle('hidden', !query);
+
+  renderSuggestions(query);
+  renderAlbumList(query);
+}
+
+// 앨범 목록 불러오기
+async function loadAlbums() {
+  albumCache = await getAllAlbums();
+
+  albumCache.sort((a, b) => b.createdAt - a.createdAt);
+
+  await renderAlbumList($('albumSearch').value);
 }
 
 async function showHome() {
@@ -240,6 +335,7 @@ async function openAlbum(album) {
   currentPhotos = await getAlbumPhotos(album.id);
 
   clearUrls();
+  $('searchSuggestions').classList.add('hidden');
 
   $('homeView').classList.add('hidden');
   $('albumView').classList.remove('hidden');
@@ -611,6 +707,49 @@ function setupViewer() {
   setupZoom();
 }
 
+// 검색 설정
+function setupSearch() {
+  const searchInput = $('albumSearch');
+  const clearButton = $('clearSearch');
+  const suggestions = $('searchSuggestions');
+
+  searchInput.addEventListener('input', handleSearch);
+
+  clearButton.addEventListener('click', () => {
+    searchInput.value = '';
+    clearButton.classList.add('hidden');
+    suggestions.classList.add('hidden');
+
+    renderAlbumList('');
+    searchInput.focus();
+  });
+
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      suggestions.classList.add('hidden');
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      const matches = getMatchingAlbums(searchInput.value);
+
+      if (matches.length > 0) {
+        event.preventDefault();
+        suggestions.classList.add('hidden');
+        openAlbum(matches[0]);
+      }
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (
+      !event.target.closest('.search-section')
+    ) {
+      suggestions.classList.add('hidden');
+    }
+  });
+}
+
 // 업로드 창
 function setupUploadDialog() {
   $('openUpload').addEventListener('click', () => {
@@ -631,6 +770,7 @@ async function init() {
 
     $('backHome').addEventListener('click', showHome);
 
+    setupSearch();
     setupUploadDialog();
     setupViewer();
 
