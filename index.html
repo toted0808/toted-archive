@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="ko">
 <head>
@@ -7,8 +8,6 @@
   <meta name="description" content="toted archive — personal photo archive">
   <title>toted archive</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -23,46 +22,71 @@
       <h1>환영합니다<span>.</span></h1>
       <p class="subtext">앨범을 열어 사진을 살펴보세요.</p>
     </section>
+
     <div id="albumList" class="album-list" aria-live="polite">
       <div class="loading">앨범을 불러오는 중…</div>
     </div>
+
     <p id="homeMessage" class="empty-message hidden">아직 앨범이 없어요.<br>첫 번째 앨범을 만들어 보세요.</p>
   </main>
 
   <main id="albumView" class="view hidden">
     <button id="backHome" class="back-button" type="button">← 전체 앨범</button>
+
     <section class="album-heading">
       <div id="albumCover" class="album-cover"></div>
       <p class="eyebrow">PHOTO COLLECTION</p>
       <h1 id="albumTitle"></h1>
       <p id="photoCount" class="subtext"></p>
     </section>
+
     <div id="photoGrid" class="photo-grid"></div>
   </main>
 
   <dialog id="uploadDialog" class="dialog">
     <form id="uploadForm" class="upload-form">
       <div class="dialog-head">
-        <div><p class="eyebrow">NEW COLLECTION</p><h2>앨범 업로드</h2></div>
+        <div>
+          <p class="eyebrow">NEW COLLECTION</p>
+          <h2>앨범 업로드</h2>
+        </div>
         <button id="closeUpload" class="icon-button" type="button" aria-label="닫기">×</button>
       </div>
-     
-      <label>앨범 제목<input id="albumName" type="text" maxlength="80" required placeholder="예: 여름의 기록"></label>
-      <label>대표 사진<input id="coverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
-     앨범 사진 <span class="hint">사진 한 장당 6MB 이하</span>
+
+      <label>
+        앨범 제목
+        <input id="albumName" type="text" maxlength="80" required placeholder="예: 여름의 기록">
+      </label>
+
+      <label>
+        대표 사진
+        <input id="coverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required>
+      </label>
+
+      <label>
+        앨범 사진
+        <span class="hint">사진 한 장당 6MB 이하</span>
+        <input id="photoFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple required>
+      </label>
+
       <p id="uploadStatus" class="status" role="status"></p>
+
       <button id="submitUpload" class="primary-button" type="submit">앨범 만들기</button>
+
       <p class="fine-print">사진은 현재 브라우저에 저장됩니다.</p>
     </form>
   </dialog>
 
   <div id="viewer" class="viewer hidden" aria-label="사진 보기">
     <button id="closeViewer" class="viewer-close" type="button" aria-label="닫기">×</button>
+
     <div id="viewerStage" class="viewer-stage">
       <img id="viewerImage" alt="확대된 사진" draggable="false">
     </div>
+
     <div id="viewerCounter" class="viewer-counter"></div>
-   <p class="viewer-help">두 손가락으로 확대 · 좌우로 밀기: 사진 넘기기 · 두 번 탭: 확대/축소</p>
+
+    <p class="viewer-help">두 손가락으로 확대 · 좌우로 밀기: 사진 넘기기 · 두 번 탭: 확대/축소</p>
   </div>
 
   <footer>toted archive <span>·</span> a place for photographs</footer>
