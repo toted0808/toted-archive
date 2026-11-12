@@ -25,29 +25,14 @@
 
     <section class="search-section">
       <div class="search-box">
-        <input
-          id="albumSearch"
-          type="search"
-          placeholder="앨범 제목 또는 태그 검색"
-          autocomplete="off"
-          aria-label="앨범 제목 또는 태그 검색"
-          aria-controls="searchSuggestions"
-          aria-autocomplete="list"
-        >
-        <button
-          id="clearSearch"
-          class="search-clear hidden"
-          type="button"
-          aria-label="검색어 지우기"
-        >×</button>
+        <input id="albumSearch" type="search" placeholder="앨범 제목 또는 태그 검색"
+          autocomplete="off" aria-label="앨범 제목 또는 태그 검색"
+          aria-controls="searchSuggestions" aria-autocomplete="list">
+        <button id="clearSearch" class="search-clear hidden" type="button"
+          aria-label="검색어 지우기">×</button>
       </div>
-
-      <div
-        id="searchSuggestions"
-        class="search-suggestions hidden"
-        role="listbox"
-        aria-label="검색 추천"
-      ></div>
+      <div id="searchSuggestions" class="search-suggestions hidden"
+        role="listbox" aria-label="검색 추천"></div>
     </section>
 
     <div class="album-layout-control" aria-label="앨범 표시 방식">
@@ -58,7 +43,6 @@
     <div id="albumList" class="album-list" aria-live="polite">
       <div class="loading">앨범을 불러오는 중…</div>
     </div>
-
     <p id="homeMessage" class="empty-message hidden">
       아직 앨범이 없어요.<br>첫 번째 앨범을 만들어 보세요.
     </p>
@@ -66,29 +50,20 @@
 
   <main id="albumView" class="view hidden">
     <button id="backHome" class="back-button" type="button">← 전체 앨범</button>
-
     <section class="album-heading">
       <div id="albumCover" class="album-cover"></div>
-
       <div class="cover-actions">
         <button id="changeCoverButton" class="back-button" type="button">표지 변경</button>
         <button id="changeTitleButton" class="back-button" type="button">제목 변경</button>
         <button id="changeTagsButton" class="back-button" type="button">태그 변경</button>
-
-        <input
-          id="changeCoverFile"
-          class="hidden"
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-        >
+        <input id="changeCoverFile" class="hidden" type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif">
       </div>
-
       <p class="eyebrow">PHOTO COLLECTION</p>
       <h1 id="albumTitle"></h1>
       <div id="detailTags" class="tag-list"></div>
       <p id="photoCount" class="subtext"></p>
     </section>
-
     <div id="photoGrid" class="photo-grid"></div>
   </main>
 
@@ -101,44 +76,37 @@
         </div>
         <button id="closeUpload" class="icon-button" type="button" aria-label="닫기">×</button>
       </div>
-
       <label>
         앨범 제목
         <input id="albumName" type="text" maxlength="80" required placeholder="예: 여름의 기록">
       </label>
-
       <label>
         태그
         <span class="hint">쉼표(,)로 구분해서 입력해 주세요.</span>
         <input id="albumTags" type="text" maxlength="300" placeholder="예: 여행, 바다, 제주도">
       </label>
-
       <label>
         대표 사진
-        <input id="coverFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required>
+        <input id="coverFile" type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif" required>
       </label>
-
       <label>
         앨범 사진
         <span class="hint">사진 한 장당 6MB 이하</span>
-        <input id="photoFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple required>
+        <input id="photoFiles" type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif" multiple required>
       </label>
-
       <p id="uploadStatus" class="status" role="status"></p>
-
       <button id="submitUpload" class="primary-button" type="submit">앨범 만들기</button>
-
       <p class="fine-print">사진은 현재 브라우저에 저장됩니다.</p>
     </form>
   </dialog>
 
   <div id="viewer" class="viewer hidden" aria-label="사진 보기">
     <button id="closeViewer" class="viewer-close" type="button" aria-label="닫기">×</button>
-
     <div id="viewerStage" class="viewer-stage">
       <img id="viewerImage" alt="확대된 사진" draggable="false">
     </div>
-
     <div id="viewerCounter" class="viewer-counter"></div>
     <p class="viewer-help">두 손가락으로 확대 · 좌우로 밀기: 사진 넘기기 · 두 번 탭: 확대/축소</p>
   </div>
