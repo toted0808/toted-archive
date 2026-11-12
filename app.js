@@ -366,6 +366,14 @@ function handleSearch() {
   renderAlbumList(query);
 }
 
+  const query = $('albumSearch').value;
+
+  $('clearSearch').classList.toggle('hidden', !query);
+
+  renderSuggestions(query);
+  renderAlbumList(query);
+}
+
 async function loadAlbums() {
   albumCache = await getAllAlbums();
   albumCache.sort((a, b) => b.createdAt - a.createdAt);
