@@ -1,3 +1,4 @@
+
 const $ = (id) => document.getElementById(id);
 
 const DB_NAME = 'totedArchive';
@@ -13,6 +14,14 @@ let viewerUrl = null;
 
 let albumCache = [];
 let albumRenderId = 0;
+
+let albumColumns = 1;
+
+try {
+  albumColumns = localStorage.getItem('totedAlbumColumns') === '2' ? 2 : 1;
+} catch (error) {
+  albumColumns = 1;
+}
 
 let scale = 1;
 let translateX = 0;
@@ -179,7 +188,6 @@ async function deleteAlbum(album) {
   }
 }
 
-// 검색어와 일치하는 앨범 찾기
 // 검색어 정리
 function normalizeSearchText(text) {
   return String(text)
@@ -198,6 +206,7 @@ function getMatchingAlbums(query) {
     normalizeSearchText(album.title).includes(keyword)
   );
 }
+
 // 자동완성 추천 목록 표시
 function renderSuggestions(query) {
   const suggestions = $('searchSuggestions');
@@ -256,6 +265,7 @@ async function renderAlbumList(query = '') {
   const message = $('homeMessage');
 
   list.innerHTML = '';
+  list.classList.toggle('grid-two', albumColumns === 2);
 
   const matchingAlbums = getMatchingAlbums(query);
 
@@ -270,7 +280,6 @@ async function renderAlbumList(query = '') {
 
   message.classList.add('hidden');
 
-  // 사진 개수를 미리 가져온다.
   const albumData = await Promise.all(
     matchingAlbums.map(async (album) => ({
       album,
@@ -278,7 +287,6 @@ async function renderAlbumList(query = '') {
     }))
   );
 
-  // 빠르게 검색어를 바꿨을 때 오래된 결과가 덮어쓰지 않도록 한다.
   if (renderId !== albumRenderId) return;
 
   albumData.forEach(({ album, photos }) => {
@@ -343,6 +351,7 @@ async function openAlbum(album) {
   currentPhotos = await getAlbumPhotos(album.id);
 
   clearUrls();
+
   $('searchSuggestions').classList.add('hidden');
 
   $('homeView').classList.add('hidden');
@@ -406,6 +415,104 @@ function validateImage(file) {
 
   return allowedTypes.includes(file.type) &&
     file.size <= MAX_FILE_SIZE;
+}
+
+// 앨범 표지 변경
+async function handleCoverChange(event) {
+  const file = event.target.files[0];
+
+  if (!file) return;
+
+  if (!validateImage(file)) {
+    alert('JPG, PNG, WEBP, GIF 형식의 6MB 이하 사진을 선택해 주세요.');
+    event.target.value = '';
+    return;
+  }
+
+  if (!currentAlbum) {
+    event.target.value = '';
+    return;
+  }
+
+  try {
+    const updatedAlbum = {
+      ...currentAlbum,
+      coverBlob: file
+    };
+
+    await saveAlbum(updatedAlbum);
+
+    currentAlbum = updatedAlbum;
+
+    const cachedIndex = albumCache.findIndex(
+      (album) => album.id === updatedAlbum.id
+    );
+
+    if (cachedIndex !== -1) {
+      albumCache[cachedIndex] = updatedAlbum;
+    }
+
+    clearUrls();
+
+    const coverImage = document.createElement('img');
+    coverImage.src = createObjectUrl(updatedAlbum.coverBlob);
+    coverImage.alt = '';
+
+    $('albumCover').replaceChildren(coverImage);
+
+    alert('앨범 표기를 변경했습니다.');
+
+  } catch (error) {
+    console.error(error);
+    alert('표지 변경에 실패했습니다. 저장 공간을 확인해 주세요.');
+
+  } finally {
+    event.target.value = '';
+  }
+}
+
+// 표지 변경 버튼 설정
+function setupCoverChange() {
+  $('changeCoverButton').addEventListener('click', () => {
+    if (currentAlbum) {
+      $('changeCoverFile').click();
+    }
+  });
+
+  $('changeCoverFile').addEventListener('change', handleCoverChange);
+}
+
+// 앨범 목록 배치 설정
+function setupAlbumLayout() {
+  const oneButton = $('layoutOne');
+  const twoButton = $('layoutTwo');
+
+  function setColumns(columns) {
+    albumColumns = columns;
+
+    try {
+      localStorage.setItem('totedAlbumColumns', String(columns));
+    } catch (error) {
+      console.warn('배치 설정을 저장하지 못했습니다.', error);
+    }
+
+    oneButton.classList.toggle('active', columns === 1);
+    twoButton.classList.toggle('active', columns === 2);
+
+    oneButton.setAttribute('aria-pressed', String(columns === 1));
+    twoButton.setAttribute('aria-pressed', String(columns === 2));
+
+    renderAlbumList($('albumSearch').value);
+  }
+
+  oneButton.addEventListener('click', () => setColumns(1));
+  twoButton.addEventListener('click', () => setColumns(2));
+
+  oneButton.classList.toggle('active', albumColumns === 1);
+  twoButton.classList.toggle('active', albumColumns === 2);
+
+  oneButton.setAttribute('aria-pressed', String(albumColumns === 1));
+  twoButton.setAttribute('aria-pressed', String(albumColumns === 2));
 }
 
 // 사진 업로드
@@ -472,6 +579,7 @@ async function handleUpload(event) {
   } catch (error) {
     console.error(error);
     status.textContent = '저장에 실패했습니다. 저장 공간을 확인해 주세요.';
+
   } finally {
     submitButton.disabled = false;
   }
@@ -659,7 +767,6 @@ function setupZoom() {
 
       const moved = Math.abs(dx) > 10 || Math.abs(dy) > 10;
 
-      // 좌우 밀기로 사진 넘기기
       if (
         scale === 1 &&
         Math.abs(dx) > 50 &&
@@ -673,7 +780,6 @@ function setupZoom() {
         return;
       }
 
-      // 두 번 탭으로 확대/축소
       if (
         event.pointerType === 'touch' &&
         !moved
@@ -750,9 +856,7 @@ function setupSearch() {
   });
 
   document.addEventListener('click', (event) => {
-    if (
-      !event.target.closest('.search-section')
-    ) {
+    if (!event.target.closest('.search-section')) {
       suggestions.classList.add('hidden');
     }
   });
@@ -779,6 +883,8 @@ async function init() {
     $('backHome').addEventListener('click', showHome);
 
     setupSearch();
+    setupAlbumLayout();
+    setupCoverChange();
     setupUploadDialog();
     setupViewer();
 
