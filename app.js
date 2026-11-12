@@ -366,14 +366,6 @@ function handleSearch() {
   renderAlbumList(query);
 }
 
-  const query = $('albumSearch').value;
-
-  $('clearSearch').classList.toggle('hidden', !query);
-
-  renderSuggestions(query);
-  renderAlbumList(query);
-}
-
 async function loadAlbums() {
   albumCache = await getAllAlbums();
   albumCache.sort((a, b) => b.createdAt - a.createdAt);
@@ -424,11 +416,7 @@ async function openAlbum(album) {
     getAlbumTags(currentAlbum),
     3
   );
-const coverImage = document.createElement('img');
-coverImage.src = createObjectUrl(currentAlbum.coverBlob);
-coverImage.alt = '';
 
-$('albumCover').replaceChildren(coverImage);
   $('photoCount').textContent = `${currentPhotos.length} PHOTOS`;
 
   let deleteButton = $('deleteAlbum');
@@ -540,6 +528,17 @@ function setupCoverChange() {
   $('changeCoverFile').addEventListener('change', handleCoverChange);
 }
 
+// 제목이나 태그를 변경한 뒤에도 기존 표지를 다시 표시
+function refreshAlbumCover() {
+  if (!currentAlbum || !currentAlbum.coverBlob) return;
+
+  const coverImage = document.createElement('img');
+  coverImage.src = createObjectUrl(currentAlbum.coverBlob);
+  coverImage.alt = '';
+
+  $('albumCover').replaceChildren(coverImage);
+}
+
 // 제목 변경
 async function handleTitleChange() {
   if (!currentAlbum) return;
@@ -583,6 +582,7 @@ async function handleTitleChange() {
     }
 
     $('albumTitle').textContent = trimmedTitle;
+    refreshAlbumCover();
 
     alert('앨범 제목을 변경했습니다.');
   } catch (error) {
@@ -632,6 +632,8 @@ async function handleTagsChange() {
       parsedTags,
       3
     );
+
+    refreshAlbumCover();
 
     alert('앨범 태그를 변경했습니다.');
   } catch (error) {
