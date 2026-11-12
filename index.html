@@ -28,9 +28,9 @@
         <input
           id="albumSearch"
           type="search"
-          placeholder="앨범 제목 검색"
+          placeholder="앨범 제목 또는 태그 검색"
           autocomplete="off"
-          aria-label="앨범 제목 검색"
+          aria-label="앨범 제목 또는 태그 검색"
           aria-controls="searchSuggestions"
           aria-autocomplete="list"
         >
@@ -71,9 +71,10 @@
       <div id="albumCover" class="album-cover"></div>
 
       <div class="cover-actions">
-        <button id="changeCoverButton" class="back-button" type="button">
-          표지 변경
-        </button>
+        <button id="changeCoverButton" class="back-button" type="button">표지 변경</button>
+        <button id="changeTitleButton" class="back-button" type="button">제목 변경</button>
+        <button id="changeTagsButton" class="back-button" type="button">태그 변경</button>
+
         <input
           id="changeCoverFile"
           class="hidden"
@@ -84,6 +85,7 @@
 
       <p class="eyebrow">PHOTO COLLECTION</p>
       <h1 id="albumTitle"></h1>
+      <div id="detailTags" class="tag-list"></div>
       <p id="photoCount" class="subtext"></p>
     </section>
 
@@ -103,6 +105,12 @@
       <label>
         앨범 제목
         <input id="albumName" type="text" maxlength="80" required placeholder="예: 여름의 기록">
+      </label>
+
+      <label>
+        태그
+        <span class="hint">쉼표(,)로 구분해서 입력해 주세요.</span>
+        <input id="albumTags" type="text" maxlength="300" placeholder="예: 여행, 바다, 제주도">
       </label>
 
       <label>
@@ -138,4 +146,5 @@
   <footer>toted archive <span>·</span> a place for photographs</footer>
 </body>
 </html>
+
 
