@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="ko">
 <head>
@@ -22,34 +23,49 @@
       <p class="subtext">앨범을 열어 사진을 살펴보세요.</p>
     </section>
 
- <!-- 앨범 검색 -->
-<section class="search-section">
-  <div class="search-box">
-    <input
-      id="albumSearch"
-      type="search"
-      placeholder="앨범 제목 검색"
-      autocomplete="off"
-      aria-label="앨범 제목 검색"
-      aria-controls="searchSuggestions"
-      aria-autocomplete="list"
-    >
+    <!-- 앨범 검색 -->
+    <section class="search-section">
+      <div class="search-box">
+        <input
+          id="albumSearch"
+          type="search"
+          placeholder="앨범 제목 검색"
+          autocomplete="off"
+          aria-label="앨범 제목 검색"
+          aria-controls="searchSuggestions"
+          aria-autocomplete="list"
+        >
+        <button
+          id="clearSearch"
+          class="search-clear hidden"
+          type="button"
+          aria-label="검색어 지우기"
+        >×</button>
+      </div>
 
-    <button
-      id="clearSearch"
-      class="search-clear hidden"
-      type="button"
-      aria-label="검색어 지우기"
-    >×</button>
-  </div>
+      <div
+        id="searchSuggestions"
+        class="search-suggestions hidden"
+        role="listbox"
+        aria-label="검색 추천"
+      ></div>
+    </section>
 
-  <div
-    id="searchSuggestions"
-    class="search-suggestions hidden"
-    role="listbox"
-    aria-label="검색 추천"
-  ></div>
-</section>
+    <!-- 앨범 표시 방식 -->
+    <div class="album-layout-control" aria-label="앨범 표시 방식">
+      <button
+        id="layoutOne"
+        class="layout-button active"
+        type="button"
+        aria-pressed="true"
+      >1열</button>
+      <button
+        id="layoutTwo"
+        class="layout-button"
+        type="button"
+        aria-pressed="false"
+      >2열</button>
+    </div>
 
     <div id="albumList" class="album-list" aria-live="polite">
       <div class="loading">앨범을 불러오는 중…</div>
@@ -65,6 +81,19 @@
 
     <section class="album-heading">
       <div id="albumCover" class="album-cover"></div>
+
+      <div class="cover-actions">
+        <button id="changeCoverButton" class="back-button" type="button">
+          표지 변경
+        </button>
+        <input
+          id="changeCoverFile"
+          class="hidden"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+        >
+      </div>
+
       <p class="eyebrow">PHOTO COLLECTION</p>
       <h1 id="albumTitle"></h1>
       <p id="photoCount" class="subtext"></p>
