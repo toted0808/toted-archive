@@ -14,7 +14,6 @@ let viewerUrl = null;
 
 let albumCache = [];
 let albumRenderId = 0;
-
 let albumColumns = 1;
 
 try {
@@ -61,6 +60,7 @@ function clearViewerUrl() {
   }
 }
 
+// 데이터베이스
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -140,6 +140,44 @@ function savePhotos(photos) {
   });
 }
 
+// 태그 정리
+function parseTags(value) {
+  const tags = String(value || '')
+    .split(',')
+    .map((tag) => tag.trim().replace(/^#+/, '').trim())
+    .filter(Boolean);
+
+  return [...new Set(tags)];
+}
+
+function getAlbumTags(album) {
+  return Array.isArray(album.tags) ? album.tags : [];
+}
+
+// 태그 표시
+function renderTags(container, tags, limit = 3) {
+  container.innerHTML = '';
+
+  if (!tags || tags.length === 0) return;
+
+  const visibleTags = tags.slice(0, limit);
+
+  visibleTags.forEach((tag) => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.textContent = `#${tag}`;
+    container.appendChild(chip);
+  });
+
+  if (tags.length > limit) {
+    const more = document.createElement('span');
+    more.className = 'tag-chip tag-more';
+    more.textContent = '…';
+    more.title = tags.slice(limit).map((tag) => `#${tag}`).join(', ');
+    container.appendChild(more);
+  }
+}
+
 // 앨범 삭제
 async function deleteAlbum(album) {
   const confirmed = confirm(
@@ -197,14 +235,21 @@ function normalizeSearchText(text) {
     .toLocaleLowerCase();
 }
 
+// 제목 또는 태그 검색
 function getMatchingAlbums(query) {
   const keyword = normalizeSearchText(query);
 
   if (!keyword) return albumCache;
 
-  return albumCache.filter((album) =>
-    normalizeSearchText(album.title).includes(keyword)
-  );
+  return albumCache.filter((album) => {
+    const titleMatches = normalizeSearchText(album.title).includes(keyword);
+
+    const tagMatches = getAlbumTags(album).some((tag) =>
+      normalizeSearchText(tag).includes(keyword)
+    );
+
+    return titleMatches || tagMatches;
+  });
 }
 
 // 자동완성
@@ -232,15 +277,11 @@ function renderSuggestions(query) {
     button.className = 'suggestion-item';
     button.setAttribute('role', 'option');
 
-    const icon = document.createElement('span');
-    icon.className = 'suggestion-icon';
-    icon.textContent = '⌕';
-
     const title = document.createElement('span');
     title.className = 'suggestion-title';
     title.textContent = album.title;
 
-    button.append(icon, title);
+    button.appendChild(title);
 
     button.addEventListener('click', () => {
       $('albumSearch').value = album.title;
@@ -301,11 +342,15 @@ async function renderAlbumList(query = '') {
     const title = document.createElement('h2');
     title.textContent = album.title;
 
+    const tags = document.createElement('div');
+    tags.className = 'tag-list';
+    renderTags(tags, getAlbumTags(album), 3);
+
     const meta = document.createElement('p');
     meta.className = 'album-meta';
     meta.textContent = `${photos.length} PHOTOS`;
 
-    card.append(cover, title, meta);
+    card.append(cover, title, tags, meta);
     card.addEventListener('click', () => openAlbum(album));
 
     list.appendChild(card);
@@ -343,7 +388,11 @@ async function showHome() {
 
 // 앨범 열기
 async function openAlbum(album) {
-  currentAlbum = album;
+  currentAlbum = {
+    ...album,
+    tags: getAlbumTags(album)
+  };
+
   currentPhotos = await getAlbumPhotos(album.id);
 
   clearUrls();
@@ -353,14 +402,20 @@ async function openAlbum(album) {
   $('homeView').classList.add('hidden');
   $('albumView').classList.remove('hidden');
 
-  $('albumTitle').textContent = album.title;
+  $('albumTitle').textContent = currentAlbum.title;
   $('albumCover').innerHTML = '';
 
   const coverImage = document.createElement('img');
-  coverImage.src = createObjectUrl(album.coverBlob);
+  coverImage.src = createObjectUrl(currentAlbum.coverBlob);
   coverImage.alt = '';
 
   $('albumCover').appendChild(coverImage);
+
+  renderTags(
+    $('detailTags'),
+    getAlbumTags(currentAlbum),
+    3
+  );
 
   $('photoCount').textContent = `${currentPhotos.length} PHOTOS`;
 
@@ -400,6 +455,7 @@ async function openAlbum(album) {
   });
 }
 
+// 이미지 파일 확인
 function validateImage(file) {
   const allowedTypes = [
     'image/jpeg',
@@ -436,7 +492,6 @@ async function handleCoverChange(event) {
     };
 
     await saveAlbum(updatedAlbum);
-
     currentAlbum = updatedAlbum;
 
     const cachedIndex = albumCache.findIndex(
@@ -447,7 +502,7 @@ async function handleCoverChange(event) {
       albumCache[cachedIndex] = updatedAlbum;
     }
 
-    // 기존 사진들의 Object URL은 유지한다.
+    // 기존 앨범 사진 URL은 유지한다.
     const coverImage = document.createElement('img');
     coverImage.src = createObjectUrl(updatedAlbum.coverBlob);
     coverImage.alt = '';
@@ -463,37 +518,124 @@ async function handleCoverChange(event) {
   }
 }
 
-// 표지 변경 버튼
 function setupCoverChange() {
-  const button = $('changeCoverButton');
-  const fileInput = $('changeCoverFile');
+  $('changeCoverButton').addEventListener('click', () => {
+    if (currentAlbum) {
+      $('changeCoverFile').click();
+    }
+  });
 
-  if (!button || !fileInput) {
-    console.error('표지 변경 버튼 또는 파일 입력 요소를 찾을 수 없습니다.');
+  $('changeCoverFile').addEventListener('change', handleCoverChange);
+}
+
+// 제목 변경
+async function handleTitleChange() {
+  if (!currentAlbum) return;
+
+  const newTitle = prompt(
+    '새로운 앨범 제목을 입력해 주세요.',
+    currentAlbum.title
+  );
+
+  if (newTitle === null) return;
+
+  const trimmedTitle = newTitle.trim();
+
+  if (!trimmedTitle) {
+    alert('앨범 제목을 입력해 주세요.');
     return;
   }
 
-  button.addEventListener('click', () => {
-    if (!currentAlbum) {
-      alert('먼저 앨범을 열어 주세요.');
-      return;
+  if (trimmedTitle.length > 80) {
+    alert('앨범 제목은 80자 이하로 입력해 주세요.');
+    return;
+  }
+
+  if (trimmedTitle === currentAlbum.title) return;
+
+  try {
+    const updatedAlbum = {
+      ...currentAlbum,
+      title: trimmedTitle
+    };
+
+    await saveAlbum(updatedAlbum);
+    currentAlbum = updatedAlbum;
+
+    const cachedIndex = albumCache.findIndex(
+      (album) => album.id === updatedAlbum.id
+    );
+
+    if (cachedIndex !== -1) {
+      albumCache[cachedIndex] = updatedAlbum;
     }
 
-    fileInput.click();
-  });
+    $('albumTitle').textContent = trimmedTitle;
 
-  fileInput.addEventListener('change', handleCoverChange);
+    alert('앨범 제목을 변경했습니다.');
+  } catch (error) {
+    console.error(error);
+    alert('제목 변경에 실패했습니다.');
+  }
+}
+
+function setupTitleChange() {
+  $('changeTitleButton').addEventListener('click', handleTitleChange);
+}
+
+// 태그 변경
+async function handleTagsChange() {
+  if (!currentAlbum) return;
+
+  const currentTags = getAlbumTags(currentAlbum).join(', ');
+
+  const newTags = prompt(
+    '태그를 쉼표(,)로 구분해서 입력해 주세요.',
+    currentTags
+  );
+
+  if (newTags === null) return;
+
+  const parsedTags = parseTags(newTags);
+
+  try {
+    const updatedAlbum = {
+      ...currentAlbum,
+      tags: parsedTags
+    };
+
+    await saveAlbum(updatedAlbum);
+    currentAlbum = updatedAlbum;
+
+    const cachedIndex = albumCache.findIndex(
+      (album) => album.id === updatedAlbum.id
+    );
+
+    if (cachedIndex !== -1) {
+      albumCache[cachedIndex] = updatedAlbum;
+    }
+
+    renderTags(
+      $('detailTags'),
+      parsedTags,
+      3
+    );
+
+    alert('앨범 태그를 변경했습니다.');
+  } catch (error) {
+    console.error(error);
+    alert('태그 변경에 실패했습니다.');
+  }
+}
+
+function setupTagsChange() {
+  $('changeTagsButton').addEventListener('click', handleTagsChange);
 }
 
 // 앨범 배치 설정
 function setupAlbumLayout() {
   const oneButton = $('layoutOne');
   const twoButton = $('layoutTwo');
-
-  if (!oneButton || !twoButton) {
-    console.error('앨범 배치 버튼을 찾을 수 없습니다.');
-    return;
-  }
 
   function setColumns(columns) {
     albumColumns = columns;
@@ -528,6 +670,7 @@ async function handleUpload(event) {
   event.preventDefault();
 
   const albumName = $('albumName').value.trim();
+  const albumTags = parseTags($('albumTags').value);
   const coverFile = $('coverFile').files[0];
   const photoFiles = Array.from($('photoFiles').files);
   const status = $('uploadStatus');
@@ -563,6 +706,7 @@ async function handleUpload(event) {
     const album = {
       id: createId(),
       title: albumName,
+      tags: albumTags,
       coverBlob: coverFile,
       createdAt: Date.now()
     };
@@ -609,7 +753,7 @@ function applyZoom() {
     `translate(${translateX}px, ${translateY}px) scale(${scale})`;
 }
 
-// 사진 뷰어
+// 사진 뷰어 열기
 function openViewer(index) {
   currentPhotoIndex = index;
 
@@ -619,6 +763,7 @@ function openViewer(index) {
   updateViewer();
 }
 
+// 사진 뷰어 닫기
 function closeViewer() {
   $('viewer').classList.add('hidden');
 
@@ -626,6 +771,7 @@ function closeViewer() {
   resetZoom();
 }
 
+// 사진 표시
 function updateViewer() {
   const photo = currentPhotos[currentPhotoIndex];
 
@@ -641,6 +787,7 @@ function updateViewer() {
     `${currentPhotoIndex + 1} / ${currentPhotos.length}`;
 }
 
+// 다음 사진
 function nextPhoto() {
   if (currentPhotoIndex < currentPhotos.length - 1) {
     currentPhotoIndex++;
@@ -648,6 +795,7 @@ function nextPhoto() {
   }
 }
 
+// 이전 사진
 function previousPhoto() {
   if (currentPhotoIndex > 0) {
     currentPhotoIndex--;
@@ -662,6 +810,7 @@ function getDistance(a, b) {
   );
 }
 
+// 더블 탭 확대/축소
 function toggleZoom() {
   if (scale > 1) {
     resetZoom();
@@ -798,6 +947,7 @@ function setupZoom() {
   stage.addEventListener('pointercancel', pointerEnd);
 }
 
+// 뷰어 설정
 function setupViewer() {
   $('closeViewer').addEventListener('click', closeViewer);
 
@@ -875,19 +1025,21 @@ async function init() {
     db = await openDatabase();
   } catch (error) {
     console.error('데이터베이스 초기화 실패:', error);
+
     $('homeMessage').textContent =
       '저장소를 불러오지 못했습니다. 브라우저 설정을 확인해 주세요.';
+
     $('homeMessage').classList.remove('hidden');
     return;
   }
 
-  // 각 기능을 개별적으로 초기화해 한 기능의 오류가
-  // 나머지 기능의 초기화를 막지 않도록 한다.
   const setupFunctions = [
     ['홈 버튼', () => $('backHome').addEventListener('click', showHome)],
     ['검색', setupSearch],
     ['앨범 배치', setupAlbumLayout],
     ['표지 변경', setupCoverChange],
+    ['제목 변경', setupTitleChange],
+    ['태그 변경', setupTagsChange],
     ['업로드', setupUploadDialog],
     ['사진 뷰어', setupViewer]
   ];
@@ -904,8 +1056,10 @@ async function init() {
     await showHome();
   } catch (error) {
     console.error('앨범 목록 불러오기 실패:', error);
+
     $('homeMessage').textContent =
       '앨범 목록을 불러오지 못했습니다.';
+
     $('homeMessage').classList.remove('hidden');
   }
 }
