@@ -1,3 +1,4 @@
+
 :root {
   color-scheme: dark;
   --bg: #111;
@@ -91,7 +92,7 @@ body {
   margin: 10px 0 0;
 }
 
-/* 寃��� */
+/* 검색 */
 .search-section {
   position: relative;
   margin: 0 0 30px;
@@ -141,7 +142,7 @@ body {
   cursor: pointer;
 }
 
-/* �먮룞�꾩꽦 */
+/* 자동완성 */
 .search-suggestions {
   position: relative;
   width: 100%;
@@ -174,7 +175,7 @@ body {
 .suggestion-icon { display: none; }
 .suggestion-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* �⑤쾾 �쒖떆 諛⑹떇 */
+/* 앨범 표시 방식 */
 .album-layout-control {
   display: flex;
   justify-content: flex-end;
@@ -199,7 +200,7 @@ body {
   border-color: var(--accent);
 }
 
-/* �⑤쾾 紐⑸줉 */
+/* 앨범 목록 */
 .album-list {
   display: flex;
   flex-direction: column;
@@ -256,7 +257,7 @@ body {
   line-height: 1.8;
 }
 
-/* �쒓렇 */
+/* 태그 */
 .tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -292,10 +293,9 @@ body {
   padding: 4px 7px;
 }
 
-/* JavaScript媛� �쒓렇 3媛쒖� 留먯쨪�� �쒖떆瑜� 吏곸젒 �쒗븳�섎�濡�
-   nth-child濡� 異붽� �붿냼瑜� �④린吏� �딆뒿�덈떎. */
+/* JavaScript가 태그 3개와 말줄임 표시를 직접 제한합니다. */
 
-/* �⑤쾾 �곸꽭 */
+/* 앨범 상세 */
 .back-button { margin: 4px 0 22px; }
 
 .album-heading { margin-bottom: 22px; }
@@ -355,7 +355,7 @@ body {
   display: block;
 }
 
-/* �낅줈�� 李� */
+/* 업로드 창 */
 .dialog {
   width: min(92vw, 440px);
   max-height: 90dvh;
@@ -431,7 +431,7 @@ body {
 
 .fine-print { text-align: center; margin: 13px 0 0; }
 
-/* �ъ쭊 酉곗뼱 */
+/* 사진 뷰어 */
 .viewer {
   position: fixed;
   inset: 0;
@@ -499,14 +499,14 @@ body {
   margin: 0;
 }
 
-/* �⑤쾾 ��젣 */
+/* 앨범 삭제 */
 .delete-album-button {
   color: #e58b8b;
   border-color: #653b3b;
   margin-top: 16px;
 }
 
-/* �섎떒 */
+/* 하단 */
 footer {
   text-align: center;
   color: #666;
