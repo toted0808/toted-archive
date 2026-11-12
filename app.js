@@ -424,7 +424,11 @@ async function openAlbum(album) {
     getAlbumTags(currentAlbum),
     3
   );
+const coverImage = document.createElement('img');
+coverImage.src = createObjectUrl(currentAlbum.coverBlob);
+coverImage.alt = '';
 
+$('albumCover').replaceChildren(coverImage);
   $('photoCount').textContent = `${currentPhotos.length} PHOTOS`;
 
   let deleteButton = $('deleteAlbum');
