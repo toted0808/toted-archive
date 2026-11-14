@@ -3,7 +3,6 @@ const $ = (id) => document.getElementById(id);
 
 const DB_NAME = 'totedArchive';
 const DB_VERSION = 1;
-const MAX_FILE_SIZE = 6 * 1024 * 1024;
 
 let db;
 let currentAlbum = null;
@@ -456,6 +455,7 @@ async function openAlbum(album) {
 }
 
 // 이미지 파일 확인
+// 파일 크기 제한은 두지 않고 이미지 형식만 검사한다.
 function validateImage(file) {
   const allowedTypes = [
     'image/jpeg',
@@ -464,8 +464,7 @@ function validateImage(file) {
     'image/gif'
   ];
 
-  return allowedTypes.includes(file.type) &&
-    file.size <= MAX_FILE_SIZE;
+  return allowedTypes.includes(file.type);
 }
 
 // 표지 변경
@@ -475,7 +474,7 @@ async function handleCoverChange(event) {
   if (!file) return;
 
   if (!validateImage(file)) {
-    alert('JPG, PNG, WEBP, GIF 형식의 6MB 이하 사진을 선택해 주세요.');
+    alert('JPG, PNG, WEBP, GIF 형식의 사진을 선택해 주세요.');
     event.target.value = '';
     return;
   }
@@ -685,7 +684,7 @@ async function handleUpload(event) {
   }
 
   if (!coverFile || !validateImage(coverFile)) {
-    status.textContent = '올바른 대표 사진을 선택해 주세요. (6MB 이하)';
+    status.textContent = '올바른 대표 사진을 선택해 주세요. (JPG, PNG, WEBP, GIF)';
     return;
   }
 
@@ -696,7 +695,7 @@ async function handleUpload(event) {
 
   if (photoFiles.some((file) => !validateImage(file))) {
     status.textContent =
-      '사진은 JPG, PNG, WEBP, GIF 형식이며 각각 6MB 이하여야 합니다.';
+      '사진은 JPG, PNG, WEBP, GIF 형식이어야 합니다.';
     return;
   }
 
@@ -1067,5 +1066,4 @@ async function init() {
 }
 
 init();
-
 
