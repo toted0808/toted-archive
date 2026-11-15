@@ -37,10 +37,39 @@ let swipeStartY = 0;
 let gestureHadMultiplePointers = false;
 let lastTap = 0;
 
+// ID 생성
 function createId() {
   return crypto.randomUUID();
 }
 
+// 미디어 종류 확인
+function getMediaType(media) {
+  if (media.mediaType) return media.mediaType;
+
+  return media.blob?.type?.startsWith('video/')
+    ? 'video'
+    : 'image';
+}
+
+// 이미지와 동영상 개수
+function getMediaCounts(mediaList) {
+  let images = 0;
+  let videos = 0;
+
+  mediaList.forEach((media) => {
+    if (getMediaType(media) === 'video') videos++;
+    else images++;
+  });
+
+  return { images, videos };
+}
+
+function formatMediaCount(mediaList) {
+  const counts = getMediaCounts(mediaList);
+  return `${counts.images} PHOTOS · ${counts.videos} VIDEOS`;
+}
+
+// 객체 URL 관리
 function createObjectUrl(blob) {
   const url = URL.createObjectURL(blob);
   objectUrls.push(url);
@@ -53,6 +82,20 @@ function clearUrls() {
 }
 
 function clearViewerUrl() {
+  const video = $('viewerVideo');
+
+  if (video) {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+  }
+
+  const image = $('viewerImage');
+
+  if (image) {
+    image.removeAttribute('src');
+  }
+
   if (viewerUrl) {
     URL.revokeObjectURL(viewerUrl);
     viewerUrl = null;
@@ -180,7 +223,7 @@ function renderTags(container, tags, limit = 3) {
 // 앨범 삭제
 async function deleteAlbum(album) {
   const confirmed = confirm(
-    `"${album.title}" 앨범과 안에 들어 있는 모든 사진을 삭제할까요?\n삭제한 데이터는 복구할 수 없습니다.`
+    `"${album.title}" 앨범과 안에 들어 있는 모든 사진과 동영상을 삭제할까요?\n삭제한 데이터는 복구할 수 없습니다.`
   );
 
   if (!confirmed) return;
@@ -217,7 +260,9 @@ async function deleteAlbum(album) {
 
     currentAlbum = null;
     currentPhotos = [];
+
     clearUrls();
+    clearViewerUrl();
 
     await showHome();
   } catch (error) {
@@ -347,7 +392,7 @@ async function renderAlbumList(query = '') {
 
     const meta = document.createElement('p');
     meta.className = 'album-meta';
-    meta.textContent = `${photos.length} PHOTOS`;
+    meta.textContent = formatMediaCount(photos);
 
     card.append(cover, title, tags, meta);
     card.addEventListener('click', () => openAlbum(album));
@@ -395,6 +440,7 @@ async function openAlbum(album) {
   currentPhotos = await getAlbumPhotos(album.id);
 
   clearUrls();
+  clearViewerUrl();
 
   $('searchSuggestions').classList.add('hidden');
 
@@ -416,7 +462,7 @@ async function openAlbum(album) {
     3
   );
 
-  $('photoCount').textContent = `${currentPhotos.length} PHOTOS`;
+  $('photoCount').textContent = formatMediaCount(currentPhotos);
 
   let deleteButton = $('deleteAlbum');
 
@@ -438,24 +484,43 @@ async function openAlbum(album) {
   const grid = $('photoGrid');
   grid.innerHTML = '';
 
-  currentPhotos.forEach((photo, index) => {
+  currentPhotos.forEach((media, index) => {
     const button = document.createElement('button');
     button.className = 'photo-cell';
     button.type = 'button';
 
-    const image = document.createElement('img');
-    image.src = createObjectUrl(photo.blob);
-    image.alt = '';
+    if (getMediaType(media) === 'video') {
+      const video = document.createElement('video');
+      video.src = createObjectUrl(media.blob);
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
 
-    button.appendChild(image);
+      button.classList.add('video-cell');
+      button.appendChild(video);
+
+      const playIcon = document.createElement('span');
+      playIcon.className = 'video-play-icon';
+      playIcon.textContent = '▶';
+      button.appendChild(playIcon);
+    } else {
+      const image = document.createElement('img');
+      image.src = createObjectUrl(media.blob);
+      image.alt = '';
+      button.appendChild(image);
+    }
+
     button.addEventListener('click', () => openViewer(index));
-
     grid.appendChild(button);
   });
 }
 
+// 파일 확장자 확인
+function getFileExtension(file) {
+  return file.name.split('.').pop().toLowerCase();
+}
+
 // 이미지 파일 확인
-// 파일 크기 제한은 두지 않고 이미지 형식만 검사한다.
 function validateImage(file) {
   const allowedTypes = [
     'image/jpeg',
@@ -465,6 +530,25 @@ function validateImage(file) {
   ];
 
   return allowedTypes.includes(file.type);
+}
+
+// 동영상 파일 확인
+function validateVideo(file) {
+  const allowedTypes = [
+    'video/mp4',
+    'video/quicktime'
+  ];
+
+  const allowedExtensions = ['mp4', 'mov'];
+  const extension = getFileExtension(file);
+
+  return allowedTypes.includes(file.type) ||
+    (allowedExtensions.includes(extension) && !file.type);
+}
+
+// 이미지 또는 동영상 확인
+function validateMedia(file) {
+  return validateImage(file) || validateVideo(file);
 }
 
 // 표지 변경
@@ -501,7 +585,6 @@ async function handleCoverChange(event) {
       albumCache[cachedIndex] = updatedAlbum;
     }
 
-    // 기존 앨범 사진 URL은 유지한다.
     const coverImage = document.createElement('img');
     coverImage.src = createObjectUrl(updatedAlbum.coverBlob);
     coverImage.alt = '';
@@ -569,7 +652,6 @@ async function handleTitleChange() {
       albumCache[cachedIndex] = updatedAlbum;
     }
 
-    // 제목만 변경하고 표지는 그대로 유지한다.
     $('albumTitle').textContent = trimmedTitle;
 
     alert('앨범 제목을 변경했습니다.');
@@ -615,7 +697,6 @@ async function handleTagsChange() {
       albumCache[cachedIndex] = updatedAlbum;
     }
 
-    // 태그만 변경하고 표지는 그대로 유지한다.
     renderTags(
       $('detailTags'),
       parsedTags,
@@ -666,14 +747,14 @@ function setupAlbumLayout() {
   twoButton.setAttribute('aria-pressed', String(albumColumns === 2));
 }
 
-// 사진 업로드
+// 사진과 동영상 업로드
 async function handleUpload(event) {
   event.preventDefault();
 
   const albumName = $('albumName').value.trim();
   const albumTags = parseTags($('albumTags').value);
   const coverFile = $('coverFile').files[0];
-  const photoFiles = Array.from($('photoFiles').files);
+  const mediaFiles = Array.from($('photoFiles').files);
   const status = $('uploadStatus');
 
   status.textContent = '';
@@ -684,24 +765,24 @@ async function handleUpload(event) {
   }
 
   if (!coverFile || !validateImage(coverFile)) {
-    status.textContent = '올바른 대표 사진을 선택해 주세요. (JPG, PNG, WEBP, GIF)';
+    status.textContent = '올바른 대표 사진을 선택해 주세요.';
     return;
   }
 
-  if (photoFiles.length === 0) {
-    status.textContent = '사진을 한 장 이상 선택해 주세요.';
+  if (mediaFiles.length === 0) {
+    status.textContent = '사진이나 동영상을 한 개 이상 선택해 주세요.';
     return;
   }
 
-  if (photoFiles.some((file) => !validateImage(file))) {
+  if (mediaFiles.some((file) => !validateMedia(file))) {
     status.textContent =
-      '사진은 JPG, PNG, WEBP, GIF 형식이어야 합니다.';
+      '지원하지 않는 파일입니다. JPG, PNG, WEBP, GIF, MP4, MOV를 선택해 주세요.';
     return;
   }
 
   const submitButton = $('submitUpload');
   submitButton.disabled = true;
-  status.textContent = '사진을 저장하고 있습니다...';
+  status.textContent = '사진과 동영상을 저장하고 있습니다...';
 
   try {
     const album = {
@@ -712,15 +793,16 @@ async function handleUpload(event) {
       createdAt: Date.now()
     };
 
-    const photos = photoFiles.map((file, index) => ({
+    const mediaList = mediaFiles.map((file, index) => ({
       id: createId(),
       albumId: album.id,
       blob: file,
+      mediaType: validateVideo(file) ? 'video' : 'image',
       sortOrder: index
     }));
 
     await saveAlbum(album);
-    await savePhotos(photos);
+    await savePhotos(mediaList);
 
     $('uploadForm').reset();
     $('uploadDialog').close();
@@ -730,7 +812,7 @@ async function handleUpload(event) {
     await showHome();
   } catch (error) {
     console.error(error);
-    status.textContent = '저장에 실패했습니다. 저장 공간을 확인해 주세요.';
+    status.textContent = '저장에 실패했습니다. 브라우저 저장 공간을 확인해 주세요.';
   } finally {
     submitButton.disabled = false;
   }
@@ -754,7 +836,7 @@ function applyZoom() {
     `translate(${translateX}px, ${translateY}px) scale(${scale})`;
 }
 
-// 사진 뷰어 열기
+// 미디어 뷰어 열기
 function openViewer(index) {
   currentPhotoIndex = index;
 
@@ -764,7 +846,7 @@ function openViewer(index) {
   updateViewer();
 }
 
-// 사진 뷰어 닫기
+// 미디어 뷰어 닫기
 function closeViewer() {
   $('viewer').classList.add('hidden');
 
@@ -772,23 +854,40 @@ function closeViewer() {
   resetZoom();
 }
 
-// 사진 표시
+// 사진 또는 동영상 표시
 function updateViewer() {
-  const photo = currentPhotos[currentPhotoIndex];
+  const media = currentPhotos[currentPhotoIndex];
 
-  if (!photo) return;
+  if (!media) return;
 
   resetZoom();
   clearViewerUrl();
 
-  viewerUrl = URL.createObjectURL(photo.blob);
-  $('viewerImage').src = viewerUrl;
+  viewerUrl = URL.createObjectURL(media.blob);
+
+  const image = $('viewerImage');
+  const video = $('viewerVideo');
+
+  if (getMediaType(media) === 'video') {
+    image.classList.add('hidden');
+
+    video.classList.remove('hidden');
+    video.src = viewerUrl;
+    video.controls = true;
+    video.playsInline = true;
+    video.load();
+  } else {
+    video.classList.add('hidden');
+
+    image.classList.remove('hidden');
+    image.src = viewerUrl;
+  }
 
   $('viewerCounter').textContent =
     `${currentPhotoIndex + 1} / ${currentPhotos.length}`;
 }
 
-// 다음 사진
+// 다음 미디어
 function nextPhoto() {
   if (currentPhotoIndex < currentPhotos.length - 1) {
     currentPhotoIndex++;
@@ -796,7 +895,7 @@ function nextPhoto() {
   }
 }
 
-// 이전 사진
+// 이전 미디어
 function previousPhoto() {
   if (currentPhotoIndex > 0) {
     currentPhotoIndex--;
@@ -829,6 +928,9 @@ function setupZoom() {
 
   stage.addEventListener('pointerdown', (event) => {
     if ($('viewer').classList.contains('hidden')) return;
+
+    // 동영상 조작 영역에서는 확대/스와이프 처리를 하지 않는다.
+    if (event.target.closest('video')) return;
 
     event.preventDefault();
     stage.setPointerCapture(event.pointerId);
@@ -1042,7 +1144,7 @@ async function init() {
     ['제목 변경', setupTitleChange],
     ['태그 변경', setupTagsChange],
     ['업로드', setupUploadDialog],
-    ['사진 뷰어', setupViewer]
+    ['미디어 뷰어', setupViewer]
   ];
 
   setupFunctions.forEach(([name, setup]) => {
@@ -1066,4 +1168,3 @@ async function init() {
 }
 
 init();
-
